@@ -12,25 +12,85 @@ buses-own [
 
   ; New local variables for students.
   ; You can create any new local variable you want. Just declare them here.
-
+  fixed_route
+  counter
+  bus_capacity
 ]
  
-globals [graph]
+globals [graph bus_number]
 
 to init-buses
   ; Initialize your agents here.
+  set counter 0
+  if bus_id mod 6 = 0 [set fixed_route [3 9 8 6 8 2 8 9]]
+  if bus_id mod 6 = 1 [set fixed_route [3 20 12 15 18 15 12 20]]
+  if bus_id mod 6 = 2 [set fixed_route [3 20 21 22 0 22 21 20]]
+  if bus_id mod 6 = 3 [set fixed_route [3 4 10 13 23 14 23 13 10 4]]
+  if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19 1 7 17 5 4]]
+  if bus_id mod 6 = 5 [set fixed_route [3 16 11 16]]
+  
+  if bus_type = 1 [set bus_capacity 12]
+  if bus_type = 2 [set bus_capacity 60]
+  if bus_type = 3 [set bus_capacity 150]
 
   ; This list contains the topology of the entire network of bus stops, which is known to all agents. You can use this, for instance, to calculate the shortest path between two bus stops.
   set graph [[22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13] [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18] [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]]
 end
 
 to execute-actions
-  ; Add decision making strategies for your agents here.
-  ; You are allowed to use the global variable 'ticks'.
-  let itermediate []
-  let temp (shortest-route 0 itermediate 5)
-  show temp
-
+  ; initialize 6 bus with different routes at the beginning
+  ifelse ticks = 2 [
+      let i 0
+      while [i < 6] [
+        if bus_number != 0 [add-bus(3)]
+        set bus_number bus_number + 1
+        set i i + 1
+      ]
+  ]
+  [
+    ; add more bus as time increases
+    if ticks mod 20 = 2 [
+      if bus_number < 31 [
+        add-bus(3)
+        set bus_number bus_number + 1
+      ]
+    ]
+  ]
+  
+  ; check whether a bus is in a bus stop
+  if current_stop = item (counter mod length(fixed_route)) fixed_route [
+    set counter counter + 1
+    ; if the bus is in centraal, drop everyone, and pick passenger with destination that matches the bus route
+    ifelse current_stop = 3 [
+      foreach bus_passengers [ drop-off-passenger (item 0 ?) ]
+      if length(bus_passengers) <= bus_capacity [ foreach get-passengers-at-stop (current_stop) [
+        if length(bus_passengers) <= bus_capacity [
+          let v ?
+          foreach fixed_route [
+            if (item 1 v = ?)
+            [ pick-up-passenger (item 0 v) ]
+          ]
+        ]
+      ]]
+      ; drop the passenger
+      foreach bus_passengers [
+        if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
+      ]
+    ]
+    [
+      ; if its not in centraal, drop passenger and pick everyone
+      foreach bus_passengers [
+        if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
+      ]
+        if length(bus_passengers) <= bus_capacity [ foreach get-passengers-at-stop (current_stop) [  
+          if length(bus_passengers) <= bus_capacity [
+            pick-up-passenger (item 0 ?)
+          ]
+        ]
+      ]
+    ]
+  ]
+  travel-to item (counter mod length(fixed_route)) fixed_route 
 end
 
 to-report shortest-route [start-stop intermediate-stops end-stop]
@@ -89,14 +149,11 @@ to-report shortest-route2 [start-stop end-stop]
     ;loop over all neighboors
     foreach (item min-val-index graph)
     [
-      let new-dist ((item min-val-index dist) + (get-distance min-val-index ? ))
-      
-      if  (((new-dist) < (item ? dist)) )[
+      if  ((item ? queue) != (infinity + 1 ) )[
       set prev(replace-item ? prev min-val-index)
-      set dist (replace-item ? dist new-dist)
+      set dist (replace-item ? dist ((item min-val-index dist) + (get-distance min-val-index ? )))
       set queue (replace-item ? queue (item ? dist))]
     ]
-
     ;set temp (temp + 1)
     ;if temp = 2 [set stop? True]
   ]
@@ -110,7 +167,7 @@ to-report shortest-route2 [start-stop end-stop]
     [set stop? True]
     set elem (item elem prev)
   ]
+  
   ;set res reverse res
   report res
 end
-
