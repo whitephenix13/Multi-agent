@@ -61,17 +61,23 @@ to execute-actions
   if current_stop = item (counter mod length(fixed_route)) fixed_route [
     set counter counter + 1
     ; if the bus is in centraal, drop everyone, and pick passenger with destination that matches the bus route
-    ifelse current_stop = 3 [
+    ifelse current_stop = 3 
+    [
       foreach bus_passengers [ drop-off-passenger (item 0 ?) ]
-      if length(bus_passengers) <= bus_capacity [ foreach get-passengers-at-stop (current_stop) [
-        if length(bus_passengers) <= bus_capacity [
-          let v ?
-          foreach fixed_route [
-            if (item 1 v = ?)
-            [ pick-up-passenger (item 0 v) ]
+      if length(bus_passengers) < bus_capacity 
+      [ 
+        foreach get-passengers-at-stop (current_stop) 
+        [
+          if length(bus_passengers) < bus_capacity 
+          [
+            let v ?
+            foreach fixed_route 
+            [
+              if (item 1 v = ?)[ pick-up-passenger (item 0 v) ]
+            ]
           ]
         ]
-      ]]
+      ]
       ; drop the passenger
       foreach bus_passengers [
         if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
@@ -82,8 +88,8 @@ to execute-actions
       foreach bus_passengers [
         if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
       ]
-        if length(bus_passengers) <= bus_capacity [ foreach get-passengers-at-stop (current_stop) [  
-          if length(bus_passengers) <= bus_capacity [
+        if length(bus_passengers) < bus_capacity [ foreach get-passengers-at-stop (current_stop) [  
+          if length(bus_passengers) < bus_capacity [
             pick-up-passenger (item 0 ?)
           ]
         ]
