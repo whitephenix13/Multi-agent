@@ -87,17 +87,49 @@ to execute-actions
         if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
       ]
     ]
+    ; if its not in centraal, we only pick passenger if we can drop him before going to the same station
     [
-      ; if its not in centraal, drop passenger and pick everyone
+      ; the checking part, we check if we should pick a passenger
+      let check_stop_position counter mod length(fixed_route)
+      let indexes n-values length fixed_route [ ? ] 
+      ; L is a list of station before going to the same station
+      let L []
+      ; boolean to stop adding
+      let halt false
+      foreach indexes [
+        let check_index (? + check_stop_position) mod length (fixed_route)
+        ; show check_index
+        ifelse current_stop != item check_index fixed_route [
+          if halt = false [
+            set L lput item check_index fixed_route L
+          ]
+        ]
+        [
+          set halt true
+        ]
+      ]
+      
+      ; drop a passenger if it is his stop
       foreach bus_passengers [
         if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
       ]
-        if length(bus_passengers) < bus_capacity [ foreach get-passengers-at-stop (current_stop) [  
-          if length(bus_passengers) < bus_capacity [
-            pick-up-passenger (item 0 ?)
+      ; if the bus is not full 
+      if length(bus_passengers) < bus_capacity [ foreach get-passengers-at-stop (current_stop) [  
+        if length(bus_passengers) < bus_capacity [
+          ; if the passenger's destination is on this bus route and is on L, pick the passenger
+          ifelse member? item 1 ? fixed_route [
+            if member? item 1 ? L [
+              pick-up-passenger (item 0 ?)
+            ]
+          ]
+          ; if the passenger's destination is not on this bus route, but the bus goes to centraal, pick the passenger
+          [
+            if member? 3 L [
+              pick-up-passenger (item 0 ?)
+            ]
           ]
         ]
-      ]
+      ]]
     ]
   ]
   travel-to item (counter mod length(fixed_route)) fixed_route 
