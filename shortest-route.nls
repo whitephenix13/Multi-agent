@@ -1,0 +1,79 @@
+to-report shortest-route [start-stop intermediate-stops end-stop]
+  let res (list)
+  let prev_stop start-stop
+  foreach intermediate-stops
+  [
+    foreach (shortest-route2 prev_stop ?1)
+    [
+      set res lput ? res  
+    ]
+    ;remove last elements to avoid duplicates 
+    set res (remove-item ((length res) - 1) res )
+    set prev_stop ?1
+  ]
+  foreach (shortest-route2 prev_stop end-stop)
+  [
+      set res lput ? res  
+  ]
+  report res
+end
+
+to-report shortest-route2 [start-stop end-stop]
+
+  let infinity 10000000000
+  let dist (n-values 24 [infinity])
+  set dist(replace-item start-stop dist 0)
+  
+  let prev (n-values 24 [-1])
+  
+  ;specific representation: elements in queue have value < infinity , with their value equal to their distance
+  let queue (n-values 24 [infinity])
+  set queue(replace-item start-stop dist 0)
+  
+  let graph-list (n-values 24 [0])
+  let ind 0
+  foreach graph-list
+  [
+    set graph-list(replace-item ind graph-list ind)
+    set ind (ind + 1)
+  ]
+  let stop? False
+  ;let temp 0 
+  while[ stop? = False]
+  [
+    ;take shortest distance from queue
+    let min-val min queue
+    let min-val-index position min-val queue
+    ;if shortest is end-stop, exit
+    if min-val-index = end-stop [
+      set stop? True
+      ]
+    ;else remove itself from queue and add neighboor to queue 
+    set queue (replace-item min-val-index queue (infinity + 1))
+    
+    ;loop over all neighboors
+    foreach (item min-val-index graph)
+    [
+      let new-dist ((item min-val-index dist) + (get-distance min-val-index ? ))
+      if  (((new-dist) < (item ? dist)) )[
+      set prev(replace-item ? prev min-val-index)
+      set dist (replace-item ? dist new-dist)
+      set queue (replace-item ? queue (item ? dist))]
+    ]
+    ;set temp (temp + 1)
+    ;if temp = 2 [set stop? True]
+  ]
+  let res (list)
+  let elem end-stop
+  set stop? False
+  while[ stop? = False]
+  [
+    set res fput elem res 
+    if elem = start-stop
+    [set stop? True]
+    set elem (item elem prev)
+  ]
+  
+  ;set res reverse res
+  report res
+end

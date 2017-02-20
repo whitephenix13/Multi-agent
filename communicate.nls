@@ -1,0 +1,26 @@
+to-report split[string separator]
+  ;read-from-string to interpret value
+  let res (list)
+  let _word ""
+  let ind 0 
+  let stop? (length(string) = 0)
+  while [stop? = False]
+  [
+    let char (item ind string)
+    ifelse(char = separator)  
+    [
+      set res lput _word res
+      set _word ""
+    ]
+    [
+      set _word word _word char
+    ]
+    set ind (ind + 1)
+    if(ind >= length(string))
+    [
+      set res lput _word res
+      set stop? True  
+    ]
+  ]
+  report res
+end
