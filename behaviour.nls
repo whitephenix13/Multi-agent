@@ -1,0 +1,23 @@
+to update_addbus_intention
+  ; initialize 6 bus with different routes at the beginning
+  ifelse ticks = 2 [
+    set addbus_intention "addinit"
+  ]
+  [
+    ; add more bus as time increases
+    ifelse ticks mod 20 = 2 [
+      ifelse bus_number < 31 [
+        set addbus_intention "add"
+      ]
+      [set addbus_intention "none"]
+    ]
+    [set addbus_intention "none"]
+  ]
+end 
+
+to update_desire
+end 
+to update_drive_intention
+end 
+to update_comm_intention
+end 

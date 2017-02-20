@@ -24,3 +24,25 @@ to-report split[string separator]
   ]
   report res
 end
+
+to-report build-message[sender-id message-id action-type content]
+  let res ""
+  set res word res sender-id  
+  set res word res "/"
+  set res word res message-id
+  set res word res "/"
+  set res word res action-type
+  set res word res "/"
+  set res word res content
+
+  report res
+end
+
+to-report read-message[string]
+ report (split string "/")
+end
+
+;build the message id as "sender_id-ticks"
+to-report build-m-id[sender-id]
+  report (word sender-id (word "-" ticks))
+end
