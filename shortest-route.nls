@@ -100,12 +100,13 @@ to-report best-route[new-stop route]
   [
     let res (list)
     let j 0
+    ; putting new-stop at each position in route
     while [j < (length(route) + 1)]
     [
       if (i = j) [set res lput new-stop res]
-      set res lput item j route res
+      if (j < length(route)) [set res lput item j route res]
+      set j (j + 1)
     ]
-    show res
     let first_stop item 0 res
     let last_stop last res
     set res remove-item 0 res

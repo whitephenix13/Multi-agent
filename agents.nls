@@ -78,7 +78,7 @@ to init-buses
   ;show travelled_distance
   ;show find-way-to-route 3 [0 11]
   ;show best-route 0 [11 17 10 13]
-  show best-route 0 [11 17 10 13] 
+  show best-route 0 [3 20 12 15 18] 
 end
 
 to drop-passenger[current_route]
