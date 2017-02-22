@@ -17,6 +17,7 @@ buses-own [
   direction       ; String: "GO" for normal route (read fixed_route from left to right) or "RETURN" (read table from right to left)
   route_index     ; Counter to keep track of the current index of the fixed_route where the bus is  
   bus_capacity    ; Keep track of maximum possible number of person
+  travelled_distance    ; Distance that is travelled by bus 
   
   ;Behavioural variables 
   desire          ; Can be "deserve" (deserve its line) "maintain" (assure that rarely used station are deserved) "connect" (assure connections between several lines)
@@ -37,7 +38,8 @@ buses-own [
   new_fixed_route    ; This is the new fixed route that the bus will follow when we wins the request. He might first have to take the deviate route in order to reach this one.
   ] 
 
-globals [graph bus_number]
+; added global variable : bus_number, bus_id_list, average distance travelled
+globals [graph bus_number bus_id_list]
 
 to init-buses
 
@@ -72,6 +74,8 @@ to init-buses
   ;let mess (build-message bus_id mess-id "INFORM" "I am happy")
   ;show mess
   ;show (read-message mess)
+  ;show bus_id_list 
+  ;show travelled_distance
 end
 
 to drop-passenger[current_route]
@@ -171,7 +175,8 @@ to pick-passenger[current_route]
       
 end
 to execute-actions
-  
+  ; initialize bus_id_list
+  if(bus_id_list) = 0 [set bus_id_list (list)]
  
   ;answer time is 1 ticks from this one , the whole conversation last 3 ticks (counting this one)
   ;filtered message
@@ -198,6 +203,7 @@ to execute-actions
     let i 0
       while [i < 6] [
         if bus_number != 0 [add-bus(3)]
+        set bus_id_list lput (bus_number + 24) bus_id_list
         set bus_number bus_number + 1
         set i i + 1
       ]
@@ -206,15 +212,18 @@ to execute-actions
   [
     ; add more bus as time increases
     add-bus(3)
+    set bus_id_list lput (bus_number + 24) bus_id_list
     set bus_number bus_number + 1
   ]
 
   
   if(drive_intention = "deserve")
-  [
-      
+  [   
    ; check whether a bus is in a bus stop
    if current_stop = item route_index fixed_route [
+    if(previous_stop != -1) [
+      set travelled_distance travelled_distance + get-distance previous_stop current_stop
+    ]
     ;compute next stop
     let break? false
     ;update index 
@@ -252,6 +261,9 @@ to execute-actions
     ; check whether a bus is in a bus stop
    if current_stop = item route_index deviate_route 
    [
+     if(previous_stop != -1) [
+       set travelled_distance (travelled_distance + get-distance previous_stop current_stop)
+     ]
        set route_index (route_index + 1)
        ;only drop passenger 
        drop-passenger deviate_route 
