@@ -1,0 +1,12 @@
+;the main heuristic that let a bus decide if he should do something or not 
+to-report heuristic[]
+  ;TODO
+end
+
+to-report check-overcrowded-station []
+  ;TODO:
+end
+
+to-report check-overcrowded-line []
+  ;TODO:
+end

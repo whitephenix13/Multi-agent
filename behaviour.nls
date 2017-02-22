@@ -18,6 +18,216 @@ end
 to update_desire
 end 
 to update_drive_intention
+  if (drive_intention = "deviate")
+  [
+    ;we reached the end of the deviation 
+    if(route_index = length(deviate_route) )
+    [
+      ;current_stop
+      if(current_stop = -1 ) 
+      [show (word "WARNING: current stop is -1 although it should be " length(deviate_route))]
+      set fixed_route new_fixed_route
+      set route_index position (item (length(deviate_route) - 1 ) deviate_route) new_fixed_route
+      set direction "GO"
+      set drive_intention "deserve"  
+    ]
+  ]
 end 
-to update_comm_intention
+
+;take the list of all recent messages as input 
+to update_comm_intention [f_messages]
+  let d_tick (ticks - disable_tick)
+  let break? false ; used to simulate an if elseif elseif else behaviour 
+  
+  if (comm_intention = "disable" and (not break?))
+  [
+    if( d_tick <= 15) ;1 ticks per minutes, 1440 let's say that the delay is of 15 min (since rush hours last ~2 hours)
+    [
+      set comm_intention "none"
+    ]  
+    set break? true
+  ]
+  if( comm_intention = "send" and (not break?))
+  [
+    set comm_intention "disable"
+    set break? true
+  ]
+  
+  if( comm_intention = "none" and (not break?))
+  [
+
+    let overcrowded_station? false ; TODO: set this condition 
+    let overcrowded_line? false; TODO: set this condition
+    let break2? false
+    
+    if (overcrowded_station? = true and (not break2?))
+    [
+      set message_receivers (list)
+      set message_to_send "" 
+      ;TODO: choose who to send message and add it to message_receivers (at first: everyone EXCEPT MYSELF)
+      ;TODO: build a REQUEST message to be sent to those buses and store it in message_to_send
+      set break2? true
+    ]
+    if(overcrowded_line? = true and (not break2?))
+    [
+      set message_receivers (list)
+      set message_to_send "" 
+      ;TODO: choose who to send message and add it to message_receivers (at first: everyone EXCEPT MYSELF)
+      ;TODO: build a REQUEST message to be sent to those buses and store it in message_to_send 
+      set break2? true
+    ]
+     
+     ;if we entered in one of the previous if, change behaviour to send and set disable_ticks
+    if( break2? = true) 
+    [
+      set comm_intention "send"
+      set disable_tick ticks
+    ]
+     set break? true
+  ]
+  
 end 
+
+;Update all the bus intention depending of the message 
+to update-message-intentions [f_messages]
+  let all_filtered (filter-message f_messages)
+  let m_inform (item 0 all_filtered)
+  let m_request (item 1 all_filtered)
+  let m_reply (item 2 all_filtered)
+  let m_action (item 3 all_filtered) 
+  
+  foreach m_inform
+  [
+    let content get-content ?
+    let info (read-INFORM-content content)
+    applyInform (item 0 info) (item 1 info)
+  ]
+  
+  applyRequest m_request
+  
+  applyReply m_reply m_request
+  
+  
+  foreach m_action
+  [
+    let content get-content ?
+    let info (read-ACTION-content content)
+    applyAction (item 0 info) (item 1 info)
+  ]
+  
+end
+
+to applyInform[var_name var_value]
+  execute-set var_name var_value
+end
+
+to applyRequest[m_request]
+  let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
+  foreach m_request
+  [
+    let content get-content ?
+    let info ( read-REQUEST-content content )
+    let var_name (item 0 info)
+    let var_val (item 1 info)
+    let treshold (item 2 info)
+    
+    let break? false
+    if(var_name = "overcrowded_station")
+    [
+      ;TODO compute the new route created by adding this station to the current route 
+      ;TODO: compute the gain(can be negative) in heuristic in that case
+      ;TODO: if (delta_value + treshold >0) :  add delta_value to heuristics_dvalue
+      ;TODO: memorize the new drive_intention created by this change : set new_drive_intention 
+      ;TODO: memorize deviate_route, the route that the bus needs to take in order to reach his new route. Deviate route should end with a stop IN new_fixed_route
+      ;TODO: memorize new_fixed_route, the new fixed route that the bus will have to take if he wins the request
+      set break? true
+    ]
+    if(var_name = "overcrowded_line")
+    [
+      ;TODO: compute the gain in heuristic in that case by moving from the current position to the next one AND deserving the next road 
+      ;TODO: if (delta_value + treshold >0) :  add delta_value to heuristics_dvalue
+      ;TODO: memorize the new drive_intention created by this change : set new_drive_intention 
+      ;TODO: memorize deviate_route, the route that the bus needs to take in order to reach his new route  Deviate route should end with a stop IN new_fixed_route
+      ;TODO: memorize new_fixed_route, the new fixed route that the bus will have to take if he wins the request
+      set break? true
+    ]
+    if(break? = false)
+    [
+      show( word (word "WARNING: the following variable name: " var_name) " was not handled in applyRequest")
+    ]
+  ]
+  if(length(heuristics_dvalue) > 0)
+  [
+    ;find best request to answer to 
+    let best_dvalue max heuristics_dvalue
+    let best_dvalue_index position best_dvalue heuristics_dvalue
+    
+    ;Send message to bus
+    let best_m (item best_dvalue_index m_request)
+    let message_id (get-m-id best_m)
+    let best_sender_id (get-sender best_m)
+    let reply_message (build-message bus_id message_id "REPLY" (build-REPLY-content (item best_sender_id heuristics_dvalue)))
+    
+    ;send the message 
+    my-send-message best_sender_id reply_message
+  ]
+end
+
+
+to applyReply[m_reply m_request]
+  let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
+  
+  foreach m_reply
+  [
+    let content get-content ?
+    let dvalue ( read-REPLY-content content )
+    set heuristics_dvalue lput dvalue heuristics_dvalue
+  ]
+  if( (length heuristics_dvalue) > 0 )
+  [
+    ;find best reply to answer to 
+    let best_dvalue max heuristics_dvalue
+    let best_dvalue_index position best_dvalue heuristics_dvalue
+    
+    ;find best reply message and get some infos 
+    let best_m (item best_dvalue_index m_reply)
+    let message_id (get-m-id best_m)
+    let best_sender_id (get-sender best_m)
+    
+    let original_message (find-matching-REQUEST m_request message_id ) 
+    let original_content (read-REQUEST-content (get-content original_message))
+    let var_name (item 0 original_content)
+    let var_value (item 1 original_content)
+     
+    ;Resend original message to the bus but this time as an action: notify him that he has to do the changes he did for the computation of delta heuristic
+    let action_message (build-message bus_id message_id "ACTION" (build-ACTION-content var_name var_value)) 
+    my-send-message best_sender_id action_message
+  ]
+end
+
+to applyAction[var_name var_value]
+    let break? false
+    if(var_name = "overcrowded_station")
+    [
+      set drive_intention new_drive_intention
+      ;deviate route has already been set 
+      set fixed_route new_fixed_route 
+      set route_index 0 ; go to first stop of deviate route 
+      set direction "GO"
+      set break? true
+    ]
+    if(var_name = "overcrowded_line")
+    [
+      set drive_intention new_drive_intention
+      ;deviate route has already been set 
+      set fixed_route new_fixed_route 
+      set route_index 0 ; go to first stop of deviate route
+      set direction "GO"
+      set break? true
+    ]
+    if(break? = false)
+    [
+      show( word (word "WARNING: the following variable name: " var_name) " was not handled in applyReply")
+    ]
+
+end

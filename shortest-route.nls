@@ -77,3 +77,13 @@ to-report shortest-route2 [start-stop end-stop]
   ;set res reverse res
   report res
 end
+
+;find shortest way from current position to the route 
+to-report find-way-to-route[]
+  ;TODO
+end
+
+;find the best route that goes through all the given bus stops
+to-report best-route[]
+  ;TODO
+end
