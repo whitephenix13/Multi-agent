@@ -79,11 +79,57 @@ to-report shortest-route2 [start-stop end-stop]
 end
 
 ;find shortest way from current position to the route 
-to-report find-way-to-route[]
+to-report find-way-to-route[current-stop route]
   ;TODO
+  let res (list)
+  foreach route[
+    let short shortest-route2 current-stop ?
+    set res lput short res
+  ]
+  report res
 end
 
 ;find the best route that goes through all the given bus stops
-to-report best-route[]
+;for now, say route = [A B C], new-stop = D. we put D at each position in route [D A B C], [A D B C], .... , get its shortest distance, and pick the shortest route among those combination
+to-report best-route[new-stop route]
   ;TODO
+  let optimal_route (list)
+  let shortest_distance 10000000000000
+  let i 0
+  while [i < (length(route) + 1)]
+  [
+    let res (list)
+    let j 0
+    while [j < (length(route) + 1)]
+    [
+      if (i = j) [set res lput new-stop res]
+      set res lput item j route res
+    ]
+    show res
+    let first_stop item 0 res
+    let last_stop last res
+    set res remove-item 0 res
+    set res remove-item (length(res) - 1) res
+    let new_route shortest-route first_stop res last_stop
+    let dnew_route total-distance new_route
+    if(shortest_distance > dnew_route) [
+      set shortest_distance dnew_route
+      set optimal_route new_route
+    ]
+    set i (i + 1)
+  ]
+  report optimal_route
+end
+
+;find total distance of a route
+to-report total-distance[route]
+  let i 0
+  let res 0
+  foreach route[
+    if(i != 0) [
+      set res (res + get-distance item i route item (i - 1) route)
+    ]
+    set i (i + 1)
+  ]
+  report res
 end

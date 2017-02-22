@@ -74,8 +74,11 @@ to init-buses
   ;let mess (build-message bus_id mess-id "INFORM" "I am happy")
   ;show mess
   ;show (read-message mess)
-  ;show bus_id_list 
+  ;show bus_id_list
   ;show travelled_distance
+  ;show find-way-to-route 3 [0 11]
+  ;show best-route 0 [11 17 10 13]
+  show best-route 0 [11 17 10 13] 
 end
 
 to drop-passenger[current_route]

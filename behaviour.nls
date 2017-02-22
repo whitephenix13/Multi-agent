@@ -65,7 +65,11 @@ to update_comm_intention [f_messages]
       set message_receivers (list)
       set message_to_send "" 
       ;TODO: choose who to send message and add it to message_receivers (at first: everyone EXCEPT MYSELF)
+      foreach bus_id_list [
+        if(bus_id != ?) [set message_receivers lput ? message_receivers]
+      ]
       ;TODO: build a REQUEST message to be sent to those buses and store it in message_to_send
+      
       set break2? true
     ]
     if(overcrowded_line? = true and (not break2?))
@@ -73,6 +77,9 @@ to update_comm_intention [f_messages]
       set message_receivers (list)
       set message_to_send "" 
       ;TODO: choose who to send message and add it to message_receivers (at first: everyone EXCEPT MYSELF)
+      foreach bus_id_list [
+        if(bus_id != ?) [set message_receivers lput ? message_receivers]
+      ]
       ;TODO: build a REQUEST message to be sent to those buses and store it in message_to_send 
       set break2? true
     ]
