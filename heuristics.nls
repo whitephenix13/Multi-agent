@@ -37,3 +37,14 @@ to-report check-overcrowded-line []
   ;TODO:
 end
 
+; calculate average travelled distance
+to-report calculate-average-travelled-distance
+  let average_distance 0
+  foreach bus_id_list [
+    ask buses with [bus_id = ?] [
+      set average_distance average_distance + travelled_distance
+    ]
+  ]
+  if(length(bus_id_list) != 0) [ set average_distance (average_distance / length(bus_id_list)) ]
+  report average_distance
+end
