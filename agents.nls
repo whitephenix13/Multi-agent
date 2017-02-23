@@ -32,6 +32,7 @@ buses-own [
   overcrowded_line   ; route (ie list of bus stop)  that the bus must take care of if he got message agreement from sender
   message_to_send    ; if comm_intention = "send", the bus will send this message to message_receivers
   message_receivers  ; List of all bus id to whom the message has to be sent 
+   
   
   new_drive_intention; Used when the bus is replying to a message. This intention will be his new drive_intention if he "wins" the request.
   deviate_route      ; This is the route that the bus will follow when he is deviating from its main fixed_route
@@ -39,7 +40,8 @@ buses-own [
   ] 
 
 ; added global variable : bus_number, bus_id_list, average distance travelled
-globals [graph bus_number bus_id_list]
+; bus_deserving_stations: List of the number of bus deserving station i //This variable is global but is constructed thanks to local knowledge ! (Blackboard system)
+globals [graph bus_number bus_id_list bus_deserving_stations]
 
 to init-buses
 
@@ -51,6 +53,14 @@ to init-buses
   if bus_id mod 6 = 3 [set fixed_route [3 4 10 13 23 14]]
   if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19]]
   if bus_id mod 6 = 5 [set fixed_route [3 16 11]]
+  
+  
+  if(bus_deserving_stations = 0 )
+  [
+    set bus_deserving_stations [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+  ]
+  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations [] fixed_route)
+  
   set direction "GO"
   set route_index 1
   
@@ -78,7 +88,7 @@ to init-buses
   ;show travelled_distance
   ;show find-way-to-route 3 [0 11]
   ;show best-route 0 [11 17 10 13]
-  show best-route 0 [3 20 12 15 18] 
+  ;show best-route 0 [3 20 12 18] 
 end
 
 to drop-passenger[current_route]
@@ -177,7 +187,9 @@ to pick-passenger[current_route]
     ]
       
 end
-to execute-actions
+to execute-actions 
+  
+  
   ; initialize bus_id_list
   if(bus_id_list) = 0 [set bus_id_list (list)]
  
@@ -216,7 +228,9 @@ to execute-actions
     ; add more bus as time increases
     add-bus(3)
     set bus_id_list lput (bus_number + 24) bus_id_list
+    
     set bus_number bus_number + 1
+
   ]
 
   
@@ -274,5 +288,29 @@ to execute-actions
    if(route_index < length(deviate_route))
     [travel-to item route_index deviate_route]
   ]
+end
+
+; add each element of addList to the original
+to-report update-bus-deserving-stations[original old_route new_route]
+  let removed_station (list); keep track of station removed: in an old route [1 2 1 ] we only want to apply ONE -1 to item 0 of original
+  let added_station (list); keep track of station added: in a route [1 2 1 ] we only want to apply ONE +1 to item 0 of original
+  foreach old_route
+  [
+    if(not (member? ?  removed_station) ) 
+    [
+      set original (replace-item ?  original ( (item ? original) - 1))
+      set removed_station lput ? removed_station
+    ]
+  ]
+  foreach new_route
+  [
+    if(not (member? ?  added_station) ) 
+    [
+      set original (replace-item ?  original ( (item ? original) + 1))
+      set added_station lput ? added_station
+    ]
+
+  ]
+  report original
 end
 

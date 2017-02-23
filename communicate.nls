@@ -144,8 +144,8 @@ to-report find-matching-REQUEST [message_list mess_id]
   ]
 end
 ;build the content so that the bus apply  set belief_variable_name value
-to-report build-INFORM-content[var_name var_value]
-  report word (word var_name "/") var_value
+to-report build-INFORM-content[var_name operator var_value]
+  report word (word (word (word var_name "/") operator) "/") var_value
 end
 to-report build-REQUEST-content[var_name var_value treshold]
   report word (word (word (word var_name "/") var_value) "/") treshold
@@ -159,8 +159,9 @@ end
 to-report read-INFORM-content[mess]
   let m (split mess "/" )
   let var_name (item 0 mess)
-  let var_value (read-from-string (item 1 mess))
-  report (list var_name var_value)
+  let operator (item 1 mess)
+  let var_value (read-from-string (item 2 mess))
+  report (list var_name operator var_value)
 end
 to-report read-REQUEST-content[mess]
   let m (split mess "/" )
@@ -182,15 +183,21 @@ to-report read-ACTION-content[mess]
   report (list var_name var_value)
 end
 ;execute the following instruction : set interpreted(var_name) var_value
-to execute-set[var_name var_value]
+to execute-set[var_name operator var_value]
   let break? false
   if(var_name = "overcrowded_station")
   [
+    ;can only be set
+    if (operator != "=")
+    [show word (word "WARNING: wrong operation " operator) " on overcrowded_station in execute-set"] 
     set overcrowded_station var_value
     set break? true
   ]
   if(var_name = "overcrowded_line")
   [
+     ;can only be set
+    if (operator != "=")
+    [show word (word "WARNING: wrong operation " operator) " on overcrowded_line in execute-set"] 
     set overcrowded_station var_value
     set break? true
   ]

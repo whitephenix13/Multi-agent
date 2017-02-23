@@ -6,9 +6,10 @@ to update_addbus_intention
   [
     ; add more bus as time increases
     ifelse ticks mod 20 = 2 [
-      ifelse bus_number < 31 [
+      ;ifelse bus_number < 31 [
+      ifelse bus_number < 61 [
         set addbus_intention "add"
-      ]
+     ]
       [set addbus_intention "none"]
     ]
     [set addbus_intention "none"]
@@ -26,6 +27,12 @@ to update_drive_intention
       ;current_stop
       if(current_stop = -1 ) 
       [show (word "WARNING: current stop is -1 although it should be " length(deviate_route))]
+      
+      
+      ;update bus_deserving_stations
+      ;the bus was in deviate and its previous route has already been removed from the variable
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations [] new_fixed_route)
+      
       set fixed_route new_fixed_route
       set route_index position (item (length(deviate_route) - 1 ) deviate_route) new_fixed_route
       set direction "GO"
@@ -107,7 +114,7 @@ to update-message-intentions [f_messages]
   [
     let content get-content ?
     let info (read-INFORM-content content)
-    applyInform (item 0 info) (item 1 info)
+    applyInform (item 0 info) (item 1 info) (item 2 info)
   ]
   
   applyRequest m_request
@@ -124,8 +131,8 @@ to update-message-intentions [f_messages]
   
 end
 
-to applyInform[var_name var_value]
-  execute-set var_name var_value
+to applyInform[var_name operator var_value]
+  ;execute-set var_name var_value
 end
 
 to applyRequest[m_request]
@@ -141,21 +148,25 @@ to applyRequest[m_request]
     let break? false
     if(var_name = "overcrowded_station")
     [
+      ;if ticks > ... (be sure that all buses are their)
       ;TODO compute the new route created by adding this station to the current route 
       ;TODO: compute the gain(can be negative) in heuristic in that case
       ;TODO: if (delta_value + treshold >0) :  add delta_value to heuristics_dvalue
       ;TODO: memorize the new drive_intention created by this change : set new_drive_intention 
       ;TODO: memorize deviate_route, the route that the bus needs to take in order to reach his new route. Deviate route should end with a stop IN new_fixed_route
       ;TODO: memorize new_fixed_route, the new fixed route that the bus will have to take if he wins the request
+      ;SHOULD BE DEVIATE ? else check buses_deserving_stations
       set break? true
     ]
     if(var_name = "overcrowded_line")
     [
+      ;if ticks > ... (be sure that all buses are their)
       ;TODO: compute the gain in heuristic in that case by moving from the current position to the next one AND deserving the next road 
       ;TODO: if (delta_value + treshold >0) :  add delta_value to heuristics_dvalue
       ;TODO: memorize the new drive_intention created by this change : set new_drive_intention 
       ;TODO: memorize deviate_route, the route that the bus needs to take in order to reach his new route  Deviate route should end with a stop IN new_fixed_route
       ;TODO: memorize new_fixed_route, the new fixed route that the bus will have to take if he wins the request
+      ;SHOULD BE DEVIATE ? else check buses_deserving_stations
       set break? true
     ]
     if(break? = false)
@@ -218,7 +229,11 @@ to applyAction[var_name var_value]
     [
       set drive_intention new_drive_intention
       ;deviate route has already been set 
-      set fixed_route new_fixed_route 
+      
+      ;update bus_deserving_stations
+      ;the bus was will go in deviate: only remove previous route
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations fixed_route [])
+      
       set route_index 0 ; go to first stop of deviate route 
       set direction "GO"
       set break? true
@@ -227,7 +242,11 @@ to applyAction[var_name var_value]
     [
       set drive_intention new_drive_intention
       ;deviate route has already been set 
-      set fixed_route new_fixed_route 
+      
+      ;update bus_deserving_stations
+      ;the bus was will go in deviate: only remove previous route
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations fixed_route [])
+      
       set route_index 0 ; go to first stop of deviate route
       set direction "GO"
       set break? true
