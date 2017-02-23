@@ -82,9 +82,14 @@ end
 to-report find-way-to-route[current-stop route]
   ;TODO
   let res (list)
+  let optimal_route (list)
+  let shortest_distance 10000000000000
   foreach route[
     let short shortest-route2 current-stop ?
-    set res lput short res
+    let d_short total-distance short
+    if(shortest_distance > d_short) [
+      set res short
+    ]
   ]
   report res
 end

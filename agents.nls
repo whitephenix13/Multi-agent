@@ -187,11 +187,30 @@ to pick-passenger[current_route]
     ]
       
 end
+<<<<<<< HEAD
 to execute-actions 
   
   
+=======
+
+; calculate average travelled distance
+to-report calculate-average-travelled-distance
+  let average_distance 0
+  foreach bus_id_list [
+    ask buses with [bus_id = ?] [
+      set average_distance average_distance + travelled_distance
+    ]
+  ]
+  if(length(bus_id_list) != 0) [ set average_distance (average_distance / length(bus_id_list)) ]
+  report average_distance
+end
+
+to execute-actions
+>>>>>>> 4feb441b3fa0b2d5ef825f01bd6abe5f8b5608fd
   ; initialize bus_id_list
   if(bus_id_list) = 0 [set bus_id_list (list)]
+  
+  show calculate-average-travelled-distance
  
   ;answer time is 1 ticks from this one , the whole conversation last 3 ticks (counting this one)
   ;filtered message
