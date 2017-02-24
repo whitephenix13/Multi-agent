@@ -28,12 +28,56 @@ to-report heuristic[my_bus_type route day_time]
 
 end
 
-to-report check-overcrowded-station []
+to-report check-overcrowded-station [bus_stop]
   ;TODO:
+  let bus_deserve_ids item bus_stop bus_deserving_stations
+  let total_remaining_seat 0
+  let res 0
+  foreach bus_deserve_ids [
+    set total_remaining_seat (total_remaining_seat + remaining-bus-capacity bus_deserve_ids)
+  ]
+  ifelse(get-passengers-at-stop bus_stop > total_remaining_seat) [
+    set res bus_stop
+  ] 
+  [
+    set res false
+  ]
+  report res
 end
 
-to-report check-overcrowded-line []
+to-report check-overcrowded-line [bus_route]
   ;TODO:
+  ;for now, we determine n equals 2
+  let n 3
+  let res 0
+  let counter 0
+  foreach bus_route [
+    let bus_deserve_ids item ? bus_deserving_stations
+    let total_remaining_seat 0
+    foreach bus_deserve_ids [
+      set total_remaining_seat (total_remaining_seat + remaining-bus-capacity bus_deserve_ids)
+    ]
+    if(get-passengers-at-stop ? > total_remaining_seat) [
+      set counter (counter + 1)
+    ] 
+  ]
+  ifelse(counter > n) [
+    set res bus_route
+  ] 
+  [
+    set res false
+  ]
+  report res
+end
+
+to-report remaining-bus-capacity [b_id]
+  let remaining_seat 0
+  ask buses with [bus_id = b_id] [
+    let total_passenger length(bus_passengers)
+    let capacity bus_capacity
+    set remaining_seat (bus_capacity - total_passenger)
+  ]
+  report remaining_seat
 end
 
 ; calculate average travelled distance

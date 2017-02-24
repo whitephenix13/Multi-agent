@@ -196,8 +196,7 @@ to pick-passenger[current_route]
       
 end
 
-
-to execute-actions
+to execute-actions 
   ; initialize bus_id_list
   if(bus_id_list) = 0 [set bus_id_list (list)]
  
