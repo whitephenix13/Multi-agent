@@ -31,7 +31,7 @@ to update_drive_intention
       
       ;update bus_deserving_stations
       ;the bus was in deviate and its previous route has already been removed from the variable
-      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations [] new_fixed_route)
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id [] new_fixed_route)
       
       set fixed_route new_fixed_route
       set route_index position (item (length(deviate_route) - 1 ) deviate_route) new_fixed_route
@@ -232,7 +232,7 @@ to applyAction[var_name var_value]
       
       ;update bus_deserving_stations
       ;the bus was will go in deviate: only remove previous route
-      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations fixed_route [])
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route [])
       
       set route_index 0 ; go to first stop of deviate route 
       set direction "GO"
@@ -245,7 +245,7 @@ to applyAction[var_name var_value]
       
       ;update bus_deserving_stations
       ;the bus was will go in deviate: only remove previous route
-      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations fixed_route [])
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route [])
       
       set route_index 0 ; go to first stop of deviate route
       set direction "GO"

@@ -40,9 +40,11 @@ buses-own [
   ] 
 
 ; added global variable : bus_number, bus_id_list, average distance travelled
-; bus_deserving_stations: List of the number of bus deserving station i //This variable is global but is constructed thanks to local knowledge ! (Blackboard system)
-globals [graph bus_number bus_id_list bus_deserving_stations]
+; bus_deserving_stations: List of list of the bus id  of bus deserving station i //This variable is global but is constructed thanks to local knowledge ! (Blackboard system)
+; hourly_passenger_location: memorize in a list of list the estimated number of passenger at a stop given the time (in hour)
+globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location]
 
+;TODOOOOOOOOOOOOOO MODIFY bus_deserving_stations so that it is a list of list of bus id derserving station i'th
 to init-buses
 
   ; Initialize your agents here.
@@ -57,9 +59,15 @@ to init-buses
   
   if(bus_deserving_stations = 0 )
   [
-    set bus_deserving_stations [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
+    set bus_deserving_stations (list)
+    let i 0 
+    while [i < 24]
+    [
+      set bus_deserving_stations lput (list) bus_deserving_stations
+      set i (i + 1)
+    ]
   ]
-  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations [] fixed_route)
+  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id [] fixed_route)
   
   set direction "GO"
   set route_index 1
@@ -187,30 +195,11 @@ to pick-passenger[current_route]
     ]
       
 end
-<<<<<<< HEAD
-to execute-actions 
-  
-  
-=======
 
-; calculate average travelled distance
-to-report calculate-average-travelled-distance
-  let average_distance 0
-  foreach bus_id_list [
-    ask buses with [bus_id = ?] [
-      set average_distance average_distance + travelled_distance
-    ]
-  ]
-  if(length(bus_id_list) != 0) [ set average_distance (average_distance / length(bus_id_list)) ]
-  report average_distance
-end
 
 to execute-actions
->>>>>>> 4feb441b3fa0b2d5ef825f01bd6abe5f8b5608fd
   ; initialize bus_id_list
   if(bus_id_list) = 0 [set bus_id_list (list)]
-  
-  show calculate-average-travelled-distance
  
   ;answer time is 1 ticks from this one , the whole conversation last 3 ticks (counting this one)
   ;filtered message
@@ -310,14 +299,19 @@ to execute-actions
 end
 
 ; add each element of addList to the original
-to-report update-bus-deserving-stations[original old_route new_route]
-  let removed_station (list); keep track of station removed: in an old route [1 2 1 ] we only want to apply ONE -1 to item 0 of original
-  let added_station (list); keep track of station added: in a route [1 2 1 ] we only want to apply ONE +1 to item 0 of original
+to-report update-bus-deserving-stations[original _bus_id old_route new_route]
+  let removed_station (list); keep track of station removed
+  let added_station (list); keep track of station added
   foreach old_route
   [
     if(not (member? ?  removed_station) ) 
     [
-      set original (replace-item ?  original ( (item ? original) - 1))
+      ;retrieve the station list
+      let station_list (item ? original)
+      ;remove its id from this station
+      let item_index position bus_id station_list
+      let new_station_list (remove-item item_index station_list)
+      set original (replace-item ?  original new_station_list)
       set removed_station lput ? removed_station
     ]
   ]
@@ -325,7 +319,11 @@ to-report update-bus-deserving-stations[original old_route new_route]
   [
     if(not (member? ?  added_station) ) 
     [
-      set original (replace-item ?  original ( (item ? original) + 1))
+       ;retrieve the station list
+      let station_list (item ? original)
+      ;add its id from this station
+      let new_station_list (lput bus_id station_list)
+      set original (replace-item ?  original new_station_list)
       set added_station lput ? added_station
     ]
 

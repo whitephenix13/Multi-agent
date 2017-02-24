@@ -15,14 +15,13 @@ to-report heuristic[my_bus_type route day_time]
   let mean_travel_cost 175000 
   let time_importance 2
   let bus_speed 1
-  let stop_per_person 1; TODO: mean number of stop per person 
-  let distance_stops 1; TODO: distance between two stops
+  let stop_per_person 4.25;mean number of stop per person 
+  let distance_stops 6.32; mean distance between two stops
   
-  let expected_people 1;TODO: the expected number of people at a bus stop 
-  ;TODO: = sum of people at stop / number of bus deserving this stop
+  let expected_people (compute-expected-people route day_time);
   
-  let people_per_day 1; TODO: the total number of people per day 
-  let route_length 1 ;TODO
+  let people_per_day 42776; the total number of people per day 
+  let route_length (compute-route-length route)
   
   set H ( time_importance * mean_time * bus_speed / (stop_per_person * distance_stops)  * expected_people / people_per_day - mean_travel_cost * cost_per_patch * route_length)
   report H 
@@ -47,4 +46,73 @@ to-report calculate-average-travelled-distance
   ]
   if(length(bus_id_list) != 0) [ set average_distance (average_distance / length(bus_id_list)) ]
   report average_distance
+end
+
+to-report compute-route-length [route]
+  let leng 0 
+  let prev_stop -1
+  foreach route
+  [
+    ifelse( prev_stop = -1)
+    [set prev_stop ?]
+    [set leng (leng + (get-distance prev_stop ?) ) ]
+  ]
+  report leng
+end
+
+to-report parse-hourly-passenger-location[]
+  file-open "hourly_passengers_location.csv"
+  let hour 0
+  let matrix (list) ; list of list of people, use hour then station id to access the element
+  while [not file-at-end?]
+  [
+    let line file-read-line
+    let people_at_station ( split line ";") ; for hour, the i'th item is the number of people at station i 
+    let l_hour (list)
+    foreach people_at_station
+    [
+      set l_hour lput (read-from-string ?) l_hour
+    ]
+    set matrix lput l_hour matrix
+  ]
+  file-close
+  report matrix
+end
+
+to-report compute-expected-people[route day_time]
+  ; Compute sum of people at stop / number of bus deserving this stop
+  ;convert day_time that is in tick to hour time 
+  let hour ((round (day_time / 60) ) mod 24)
+  let a (1 - ((day_time / 60) mod 1)) ; get how much we take of hour
+  let b (1 - a) ; get how much we take from (hour + 1)
+  
+  if (hourly_passenger_location = 0)
+  [
+    set hourly_passenger_location parse-hourly-passenger-location
+  ]
+  let _sum 0
+  let encountered_stop (list) ; avoid to count twice a stop if it is twice in the route
+  foreach route
+  [
+      if( not (member? ? encountered_stop) )
+      [
+        let num_pass_at_stop 0 ; = a * num_pass_at_stop_h1 + b * num_pass_at_stop_h2
+        let num_pass_at_stop_h1 (item ? (item hour hourly_passenger_location))
+        let num_pass_at_stop_h2 0
+        ifelse(hour != 23)
+        [
+         set num_pass_at_stop_h2 (item ? (item (hour + 1) hourly_passenger_location))
+        ]
+        [
+          set num_pass_at_stop_h2 0
+        ]
+        ;interpolate between current hour and next hour
+        set num_pass_at_stop (a * num_pass_at_stop_h1 + b * num_pass_at_stop_h2)
+        
+        let num_bus_deserving_stop (length (item ? bus_deserving_stations) )
+        set _sum (_sum + num_pass_at_stop / num_bus_deserving_stop)
+        set encountered_stop lput ? encountered_stop
+      ]
+  ] 
+  report _sum; 
 end
