@@ -1,7 +1,8 @@
 ;the main heuristic that let a bus decide if he should do something or not 
 ;day_time given in ticks
-to-report heuristic[my_bus_type route day_time]
-  let H 0 
+
+to-report travel-gain[my_bus_type route]
+  let mean_travel_cost 175000 
   
   let cost_per_patch 0
   if my_bus_type = 1 
@@ -10,9 +11,15 @@ to-report heuristic[my_bus_type route day_time]
   [set cost_per_patch 1.5]
    if my_bus_type = 3 
   [set cost_per_patch 2]
+  
+  let route_length (compute-route-length route)
+    
+  report (-1 * mean_travel_cost * cost_per_patch * route_length)
+end 
 
+to-report passenger-gain[route day_time]
   let mean_time 420
-  let mean_travel_cost 175000 
+
   let time_importance 2
   let bus_speed 1
   let stop_per_person 4.25;mean number of stop per person 
@@ -21,22 +28,27 @@ to-report heuristic[my_bus_type route day_time]
   let expected_people (compute-expected-people route day_time);
   
   let people_per_day 42776; the total number of people per day 
-  let route_length (compute-route-length route)
+  report (time_importance * mean_time * (stop_per_person * distance_stops) / bus_speed  * expected_people / people_per_day)
+end
+
+to-report heuristic[my_bus_type route day_time]
+  let H 0 
+  let travel_g (travel-gain my_bus_type route)
+  let pass_g (passenger-gain route day_time)
   
-  set H ( time_importance * mean_time * bus_speed / (stop_per_person * distance_stops)  * expected_people / people_per_day - mean_travel_cost * cost_per_patch * route_length)
+  set H (pass_g + travel_g)
   report H 
 
 end
 
 to-report check-overcrowded-station [bus_stop]
-  ;TODO:
   let bus_deserve_ids item bus_stop bus_deserving_stations
   let total_remaining_seat 0
   let res 0
   foreach bus_deserve_ids [
-    set total_remaining_seat (total_remaining_seat + remaining-bus-capacity bus_deserve_ids)
+    set total_remaining_seat (total_remaining_seat + remaining-bus-capacity ?)
   ]
-  ifelse(get-passengers-at-stop bus_stop > total_remaining_seat) [
+  ifelse( length(get-passengers-at-stop bus_stop) > total_remaining_seat) [
     set res bus_stop
   ] 
   [
@@ -46,22 +58,16 @@ to-report check-overcrowded-station [bus_stop]
 end
 
 to-report check-overcrowded-line [bus_route]
-  ;TODO:
-  ;for now, we determine n equals 2
-  let n 3
+  let max_overcrowded_stop 3
   let res 0
   let counter 0
   foreach bus_route [
-    let bus_deserve_ids item ? bus_deserving_stations
-    let total_remaining_seat 0
-    foreach bus_deserve_ids [
-      set total_remaining_seat (total_remaining_seat + remaining-bus-capacity bus_deserve_ids)
-    ]
-    if(get-passengers-at-stop ? > total_remaining_seat) [
+    if( (check-overcrowded-station ?) != false)
+    [
       set counter (counter + 1)
-    ] 
+    ]
   ]
-  ifelse(counter > n) [
+  ifelse(counter > max_overcrowded_stop) [
     set res bus_route
   ] 
   [
@@ -92,18 +98,6 @@ to-report calculate-average-travelled-distance
   report average_distance
 end
 
-to-report compute-route-length [route]
-  let leng 0 
-  let prev_stop -1
-  foreach route
-  [
-    ifelse( prev_stop = -1)
-    [set prev_stop ?]
-    [set leng (leng + (get-distance prev_stop ?) ) ]
-  ]
-  report leng
-end
-
 to-report parse-hourly-passenger-location[]
   file-open "hourly_passengers_location.csv"
   let hour 0
@@ -126,7 +120,7 @@ end
 to-report compute-expected-people[route day_time]
   ; Compute sum of people at stop / number of bus deserving this stop
   ;convert day_time that is in tick to hour time 
-  let hour ((round (day_time / 60) ) mod 24)
+  let hour ((floor (day_time / 60) ) mod 24)
   let a (1 - ((day_time / 60) mod 1)) ; get how much we take of hour
   let b (1 - a) ; get how much we take from (hour + 1)
   

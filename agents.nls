@@ -1,4 +1,4 @@
-__includes [ "shortest-route.nls" "communicate.nls" "behaviour.nls" "heuristics.nls"]
+__includes [ "shortest-route.nls" "communicate.nls" "behaviour.nls" "heuristics.nls" "utilities.nls"]
 buses-own [
   ; Static, read-only variables. These values never change. You can read them, but you cannot change them.
   bus_id          ; The ID of a given agent (bus). Each agent has a unique ID.
@@ -37,18 +37,21 @@ buses-own [
   new_drive_intention; Used when the bus is replying to a message. This intention will be his new drive_intention if he "wins" the request.
   deviate_route      ; This is the route that the bus will follow when he is deviating from its main fixed_route
   new_fixed_route    ; This is the new fixed route that the bus will follow when we wins the request. He might first have to take the deviate route in order to reach this one.
+  
+  start_delay        ; set a delay to initiated bus so that they do not all leave centraal station at the same moment 
   ] 
 
 ; added global variable : bus_number, bus_id_list, average distance travelled
 ; bus_deserving_stations: List of list of the bus id  of bus deserving station i //This variable is global but is constructed thanks to local knowledge ! (Blackboard system)
 ; hourly_passenger_location: memorize in a list of list the estimated number of passenger at a stop given the time (in hour)
-globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location]
+; init_num_bus_per_line: for convienience and parameter optimization. this number is fixed 
+globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line]
 
-;TODOOOOOOOOOOOOOO MODIFY bus_deserving_stations so that it is a list of list of bus id derserving station i'th
 to init-buses
-
-  ; Initialize your agents here.
+  if(init_num_bus_per_line = 0)
+  [set init_num_bus_per_line 2]
   
+  ; Initialize your agents here.
   if bus_id mod 6 = 0 [set fixed_route [3 9 8 6 8 2]]
   if bus_id mod 6 = 1 [set fixed_route [3 20 12 15 18]]
   if bus_id mod 6 = 2 [set fixed_route [3 20 21 22 0]]
@@ -56,6 +59,10 @@ to init-buses
   if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19]]
   if bus_id mod 6 = 5 [set fixed_route [3 16 11]]
   
+  ;set a delay so that the buses are equally distributed over the line 
+  let line_length (compute-route-length fixed_route)
+  let nb_bus_on_this_line (floor ((bus_id - 24) / 6) )
+  set start_delay ( nb_bus_on_this_line * 2 * line_length / init_num_bus_per_line)
   
   if(bus_deserving_stations = 0 )
   [
@@ -197,103 +204,96 @@ to pick-passenger[current_route]
 end
 
 to execute-actions 
-  ; initialize bus_id_list
-  if(bus_id_list) = 0 [set bus_id_list (list)]
- 
-  ;answer time is 1 ticks from this one , the whole conversation last 3 ticks (counting this one)
-  ;filtered message
-  let f_messages (retrieve-recent inbox ticks 4)
-  ;Read all messages and apply the changes
-  update-message-intentions f_messages
   
-  update_desire
-  update_addbus_intention
-  update_drive_intention
-  update_comm_intention f_messages
-  
-
-  ;send message 
-  if(comm_intention = "send")
+  ifelse(start_delay > 0)
   [
-    foreach message_receivers
-    [my-send-message ? message_to_send]
+    set start_delay (start_delay - 1 )
   ]
-  
-  if(addbus_intention = "addinit")
   [
-    ; initialize 6 bus with different routes at the beginning
-    let i 0
-      while [i < 6] [
+    ; initialize bus_id_list
+    if(bus_id_list) = 0 [set bus_id_list (list)]
+    
+    ;answer time is 1 ticks from this one , the whole conversation last 3 ticks (counting this one)
+    ;filtered message
+    let f_messages (retrieve-recent inbox ticks 4)
+    ;Read all messages and apply the changes
+    update-message-intentions f_messages
+    
+    update_desire
+    update_addbus_intention
+    update_drive_intention
+    update_comm_intention f_messages
+    
+    
+    ;send message 
+    if(comm_intention = "send")
+    [
+      foreach message_receivers
+      [my-send-message ? (message_to_send)]
+    ]
+    
+    if(addbus_intention = "addinit")
+    [
+      ; initialize (init_num_bus_per_line * 6) buses pet line at the beginning
+      let i 0
+      while [i < (init_num_bus_per_line * 6 + 1)] [
         if bus_number != 0 [add-bus(3)]
         set bus_id_list lput (bus_number + 24) bus_id_list
         set bus_number bus_number + 1
         set i i + 1
       ]
-  ]
-  if(addbus_intention = "add")
-  [
-    ; add more bus as time increases
-    add-bus(3)
-    set bus_id_list lput (bus_number + 24) bus_id_list
-    
-    set bus_number bus_number + 1
-
-  ]
-
-  
-  if(drive_intention = "deserve")
-  [   
-   ; check whether a bus is in a bus stop
-   if current_stop = item route_index fixed_route [
-    if(previous_stop != -1) [
-      set travelled_distance travelled_distance + get-distance previous_stop current_stop
     ]
-    ;compute next stop
-    let break? false
-    ;update index 
-    if(direction = "GO" and (break? = false)) 
+    if(addbus_intention = "add")
     [
-      ;if we are at the last top in GO direction
-      ifelse(route_index = (length(fixed_route)) - 1)
-      [
-        set direction "RETURN"
-        set route_index (route_index - 1)
-      ]
-      [set route_index (route_index + 1)]
-      set break? true
+      ; add more bus as time increases
+      add-bus(3)
+      set bus_id_list lput (bus_number + 24) bus_id_list
+      
+      set bus_number bus_number + 1
+      
     ]
     
-    if(direction = "RETURN" and (break? = false)) 
+    
+    if(drive_intention = "deserve")
+    [   
+      ; check whether a bus is in a bus stop
+      if current_stop = item route_index fixed_route [
+        if(previous_stop != -1) [
+          set travelled_distance travelled_distance + get-distance previous_stop current_stop
+        ]
+        ;compute next stop
+        let break? false
+        
+        ;update index and direction 
+        let next_dir_index (get-next-direction-index bus_id)
+        set direction (item 0 next_dir_index)
+        set route_index (item 1 next_dir_index)
+      
+        drop-passenger fixed_route
+        pick-passenger fixed_route
+      ]
+      travel-to item route_index fixed_route 
+    ]
+    if(drive_intention = "deviate")
     [
-      ;if  we are at the last top in RETURN direction
-      ifelse(route_index = 0)
+      ; check whether a bus is in a bus stop
+      if current_stop = item route_index deviate_route 
       [
-        set direction "GO"
-        set route_index (route_index + 1)
+        if(previous_stop != -1) [
+          set travelled_distance (travelled_distance + get-distance previous_stop current_stop)
+        ]
+        
+        ;update index and direction 
+        let next_dir_index (get-next-direction-index bus_id)
+        set direction (item 0 next_dir_index)
+        set route_index (item 1 next_dir_index)
+        
+        ;only drop passenger 
+        drop-passenger deviate_route 
       ]
-      [set route_index (route_index - 1)]
-      set break? true
+      if(route_index < length(deviate_route))
+      [travel-to item route_index deviate_route]
     ]
-    
-    drop-passenger fixed_route
-    pick-passenger fixed_route
-  ]
-    travel-to item route_index fixed_route 
-  ]
-  if(drive_intention = "deviate")
-  [
-    ; check whether a bus is in a bus stop
-   if current_stop = item route_index deviate_route 
-   [
-     if(previous_stop != -1) [
-       set travelled_distance (travelled_distance + get-distance previous_stop current_stop)
-     ]
-       set route_index (route_index + 1)
-       ;only drop passenger 
-       drop-passenger deviate_route 
-   ]
-   if(route_index < length(deviate_route))
-    [travel-to item route_index deviate_route]
   ]
 end
 

@@ -43,24 +43,29 @@ to-report read-message[string]
 end
 ;Get information of !!read!! message 
 to-report get-sender[string]
-  report (item 0 string)
+  let m (read-message string)
+  report (item 0 m)
 end
 to-report get-m-id[string]
-  report (item 1 string)
+  let m (read-message string)
+  report (item 1 m)
 end
 to-report get-action-type[string]
-  report (item 2 string)
+  let m (read-message string)
+  report (item 2 m)
 end
 to-report get-content[string]
-  report (item 3 string)
+  let m (read-message string)
+  report (item 3 m)
 end
 ;build the message id as "sender_id-ticks"
-to-report build-m-id[message]
-  let sender-id ( get-m-id message)
-  report (word sender-id (word "-" ticks))
+to-report build-m-id[sender_bus_id]
+  report (word sender_bus_id (word "-" ticks))
 end
 ;break an message id to retrieve the send time 
-to-report get-sender-information[mess_id]
+to-report get-sender-information[mess]
+  let m (read-message mess)
+  let mess_id (get-m-id mess)
   report (split mess_id "-")
 end
 
@@ -74,6 +79,7 @@ end
 to-report retrieve-recent[_inbox _tick time_tol]
   set _inbox reverse _inbox
   let l (list)
+  ;message in inbox is [tick, sender, message]
   foreach(inbox)
   [
     let m_tick (item 0 ?)
@@ -82,7 +88,7 @@ to-report retrieve-recent[_inbox _tick time_tol]
       ;We are in the older message part, we can break
       stop
     ]
-    set l lput (item 3 ?) l    
+    set l lput (item 2 ?) l    
   ]
   report l
 end
@@ -94,10 +100,10 @@ to-report filter-message[messages]
   let l_inform (list)
   foreach messages
   [
-    let m ? 
+    let m ?
     let m_action_type (get-action-type m)
     let sender_info (get-sender-information m)
-    let sent_tick (item 1 sender_info)
+    let sent_tick (read-from-string (item 1 sender_info))
     let break? false
     
     ;We only consider message that were sent in the previous tick
@@ -145,29 +151,29 @@ to-report find-matching-REQUEST [message_list mess_id]
 end
 ;build the content so that the bus apply  set belief_variable_name value
 to-report build-INFORM-content[var_name operator var_value]
-  report word (word (word (word var_name "/") operator) "/") var_value
+  report word (word (word (word var_name ";") operator) ";") var_value
 end
 to-report build-REQUEST-content[var_name var_value treshold]
-  report word (word (word (word var_name "/") var_value) "/") treshold
+  report word (word (word (word var_name ";") var_value) ";") treshold
 end
 to-report build-REPLY-content[value]
   report value
 end
 to-report build-ACTION-content[var_name var_value]
-  report word (word var_name "/") var_value
+  report word (word var_name ";") var_value
 end
 to-report read-INFORM-content[mess]
-  let m (split mess "/" )
-  let var_name (item 0 mess)
-  let operator (item 1 mess)
-  let var_value (read-from-string (item 2 mess))
+  let m (split mess ";" )
+  let var_name (item 0 m)
+  let operator (item 1 m)
+  let var_value (read-from-string (item 2 m))
   report (list var_name operator var_value)
 end
 to-report read-REQUEST-content[mess]
-  let m (split mess "/" )
-  let var_name (item 0 mess)
-  let var_value (read-from-string (item 1 mess))
-  let treshold (read-from-string (item 2 mess))
+  let m (split mess ";" )
+  let var_name (item 0 m)
+  let var_value (read-from-string (item 1 m))
+  let treshold (read-from-string (item 2 m))
   report (list var_name var_value treshold)
 end
 ;assumption: you only reply to a request
@@ -177,9 +183,9 @@ to-report read-REPLY-content[mess]
 end
 
 to-report read-ACTION-content[mess]
-  let m (split mess "/" )
-  let var_name (item 0 mess)
-  let var_value (read-from-string (item 1 mess))
+  let m (split mess ";" )
+  let var_name (item 0 m)
+  let var_value (read-from-string (item 1 m))
   report (list var_name var_value)
 end
 ;execute the following instruction : set interpreted(var_name) var_value

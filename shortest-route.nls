@@ -80,7 +80,6 @@ end
 
 ;find shortest way from current position to the route 
 to-report find-way-to-route[current-stop route]
-  ;TODO
   let res (list)
   let optimal_route (list)
   let shortest_distance 10000000000000
@@ -97,7 +96,6 @@ end
 ;find the best route that goes through all the given bus stops
 ;for now, say route = [A B C], new-stop = D. we put D at each position in route [D A B C], [A D B C], .... , get its shortest distance, and pick the shortest route among those combination
 to-report best-route[new-stop route]
-  ;TODO
   let optimal_route (list)
   let shortest_distance 10000000000000
   let i 0
@@ -139,3 +137,4 @@ to-report total-distance[route]
   ]
   report res
 end
+

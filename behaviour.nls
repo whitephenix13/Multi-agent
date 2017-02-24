@@ -4,15 +4,7 @@ to update_addbus_intention
     set addbus_intention "addinit"
   ]
   [
-    ; add more bus as time increases
-    ifelse ticks mod 20 = 2 [
-      ;ifelse bus_number < 31 [
-      ifelse bus_number < 61 [
-        set addbus_intention "add"
-     ]
-      [set addbus_intention "none"]
-    ]
-    [set addbus_intention "none"]
+    set addbus_intention "none"
   ]
 end 
 
@@ -62,34 +54,70 @@ to update_comm_intention [f_messages]
   
   if( comm_intention = "none" and (not break?))
   [
+    let current_route -1
+    if(drive_intention = "deserve" )
+    [set current_route fixed_route]
+    ;we do not check for optimization if we are deviating 
+    if(drive_intention = "deviate" )
+    [set current_route []]
+      
+    ;only check station if we are at the current station
+    let check_stations? (member? current_stop current_route) 
+    ;only check line if we are at the first of last station of main_route (=fixed_route)
+    let check_line? ( (current_stop = (first current_route) ) or (current_stop = (last current_route)) )
+    
 
-    let overcrowded_station? false ; TODO: set this condition 
-    let overcrowded_line? false; TODO: set this condition
     let break2? false
     
-    if (overcrowded_station? = true and (not break2?))
+    if(check_line?)
     [
-      set message_receivers (list)
-      set message_to_send "" 
-      ;TODO: choose who to send message and add it to message_receivers (at first: everyone EXCEPT MYSELF)
-      foreach bus_id_list [
-        if(bus_id != ?) [set message_receivers lput ? message_receivers]
+      let overcrowded_line? (check-overcrowded-station current_stop)
+      if(overcrowded_line? != false and (not break2?))
+      [
+        set message_receivers (list)
+        set message_to_send "" 
+
+        ;Send message to every bus does not already have all of my stop in his line
+        foreach bus_id_list [
+          let bus_route -1
+          ask buses with[bus_id = ?] [set bus_route fixed_route]
+          if( (equal-route-stops current_route bus_route) = false)
+          [
+            set message_receivers lput ? message_receivers
+          ]
+        ]
+        let treshold 0 ; if the delta heuristic of the bus is >0 then the bus can respond to the request
+        let message_cont (build-REQUEST-content "overcrowded_line" current_route treshold)
+        let mess_id (build-m-id bus_id)
+        set message_to_send (build-message bus_id mess_id "REQUEST" message_cont)
+        set break2? true
       ]
-      ;TODO: build a REQUEST message to be sent to those buses and store it in message_to_send
-      
-      set break2? true
     ]
-    if(overcrowded_line? = true and (not break2?))
+    if(check_stations?)
     [
-      set message_receivers (list)
-      set message_to_send "" 
-      ;TODO: choose who to send message and add it to message_receivers (at first: everyone EXCEPT MYSELF)
-      foreach bus_id_list [
-        if(bus_id != ?) [set message_receivers lput ? message_receivers]
+      let overcrowded_station? (check-overcrowded-line current_route)
+      if (overcrowded_station? != false and (not break2?))
+      [
+        set message_receivers (list)
+        set message_to_send "" 
+        
+        ;send message to buses that don't have this stop in their route
+        foreach bus_id_list [
+          let bus_route -1
+          ask buses with[bus_id = ?] [set bus_route fixed_route]
+          if(not ( member? current_stop bus_route) )
+          [
+            set message_receivers lput ? message_receivers
+          ]
+        ]
+        let treshold 0 ; if the delta heuristic of the bus is >0 then the bus can respond to the request
+        let message_cont (build-REQUEST-content "overcrowded_station" current_stop treshold)
+        let mess_id (build-m-id bus_id)
+        set message_to_send (build-message bus_id mess_id "REQUEST" message_cont)
+        set break2? true
       ]
-      ;TODO: build a REQUEST message to be sent to those buses and store it in message_to_send 
-      set break2? true
     ]
+
      
      ;if we entered in one of the previous if, change behaviour to send and set disable_ticks
     if( break2? = true) 
@@ -137,6 +165,14 @@ end
 
 to applyRequest[m_request]
   let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
+  
+  let current_route -1
+  if(drive_intention = "deserve" )
+  [set current_route fixed_route]
+
+  if(drive_intention = "deviate" )
+  [set current_route []]
+    
   foreach m_request
   [
     let content get-content ?
@@ -146,29 +182,57 @@ to applyRequest[m_request]
     let treshold (item 2 info)
     
     let break? false
-    if(var_name = "overcrowded_station")
+    
+    if(var_name = "overcrowded_line" and (break? = false))
     [
-      ;if ticks > ... (be sure that all buses are their)
-      ;TODO compute the new route created by adding this station to the current route 
-      ;TODO: compute the gain(can be negative) in heuristic in that case
-      ;TODO: if (delta_value + treshold >0) :  add delta_value to heuristics_dvalue
-      ;TODO: memorize the new drive_intention created by this change : set new_drive_intention 
-      ;TODO: memorize deviate_route, the route that the bus needs to take in order to reach his new route. Deviate route should end with a stop IN new_fixed_route
-      ;TODO: memorize new_fixed_route, the new fixed route that the bus will have to take if he wins the request
-      ;SHOULD BE DEVIATE ? else check buses_deserving_stations
+      ;wait for every bus to be on the line 
+      if( ticks > 60) 
+      [
+        ;compute the cost of reaching the new route
+        let next_s (item 1 (get-next-direction-index bus_id))
+        let dev_route (find-way-to-route next_s current_route)
+        let dev_cos (travel-gain bus_type dev_route)
+        
+        ;compute the heuristic for deserving the next route 
+        let new_heur (heuristic bus_type var_val ticks)
+        ;compute current heuristc 
+        let cur_heur (heuristic bus_type current_route ticks)
+
+        ;compute the difference between heuristic
+        let d_heur ( (new_heur + dev_cos) - (cur_heur) )
+        
+        if( d_heur > treshold)
+        [
+          show word "Deviate to overcrowded line " var_val
+          set new_drive_intention "deviate"
+          set deviate_route dev_route
+          set new_fixed_route var_val
+        ]
+      ]
       set break? true
     ]
-    if(var_name = "overcrowded_line")
+    if(var_name = "overcrowded_station" and (break? = false) )
     [
-      ;if ticks > ... (be sure that all buses are their)
-      ;TODO: compute the gain in heuristic in that case by moving from the current position to the next one AND deserving the next road 
-      ;TODO: if (delta_value + treshold >0) :  add delta_value to heuristics_dvalue
-      ;TODO: memorize the new drive_intention created by this change : set new_drive_intention 
-      ;TODO: memorize deviate_route, the route that the bus needs to take in order to reach his new route  Deviate route should end with a stop IN new_fixed_route
-      ;TODO: memorize new_fixed_route, the new fixed route that the bus will have to take if he wins the request
-      ;SHOULD BE DEVIATE ? else check buses_deserving_stations
-      set break? true
+       ;wait for every bus to be on the line 
+      if( ticks > 60) 
+      [
+        ;compute route induced by the addition of the overcrowded station to current_route
+        let new_route (best-route var_val current_route)
+        ;compute new and previous gain
+        let new_heur  (heuristic bus_type new_route ticks)
+        let cur_heur (heuristic bus_type current_route ticks)
+        let d_heur (new_heur - cur_heur)
+        if( d_heur > treshold)
+        [
+          show word "Deviate to overcrowded station " var_val
+          set new_drive_intention "deserve"
+          set deviate_route []
+          set new_fixed_route new_route
+        ]
+      ]
+     set break? true
     ]
+
     if(break? = false)
     [
       show( word (word "WARNING: the following variable name: " var_name) " was not handled in applyRequest")
@@ -232,10 +296,21 @@ to applyAction[var_name var_value]
       
       ;update bus_deserving_stations
       ;the bus was will go in deviate: only remove previous route
-      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route [])
+      set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route new_fixed_route)
+     
+      ;direction stays the same 
+      ;set the route index to the correct value
+      if (item route_index fixed_route != item route_index new_fixed_route)
+      [
+        ;the new stop was introduced before our next stop
+        if direction = "GO"
+        [set route_index (route_index + 1) ]
+        ;the new stop was introduced after our next stop
+        if direction = "RETURN"
+        [set route_index (route_index - 1) ]
+      ]
+      set fixed_route new_fixed_route
       
-      set route_index 0 ; go to first stop of deviate route 
-      set direction "GO"
       set break? true
     ]
     if(var_name = "overcrowded_line")
