@@ -28,8 +28,8 @@ buses-own [
   disable_tick    ; tick value when the bus send a message for a discussion he initiated. Prevents spamming 
   
   ;Belief variables
-  overcrowded_station; station_id of the overcrowded station that the bus must take care of if he got message agreement from sender
-  overcrowded_line   ; route (ie list of bus stop)  that the bus must take care of if he got message agreement from sender
+  overcrowded_station; List of [station_id,ticks when message received]: when receiving a request to deviate to an overcrowded station , can't send the same message during a period of time
+  overcrowded_line   ; List of [route, ticks when message received]: same as before
   message_to_send    ; if comm_intention = "send", the bus will send this message to message_receivers
   message_receivers  ; List of all bus id to whom the message has to be sent 
    
@@ -39,17 +39,27 @@ buses-own [
   new_fixed_route    ; This is the new fixed route that the bus will follow when we wins the request. He might first have to take the deviate route in order to reach this one.
   
   start_delay        ; set a delay to initiated bus so that they do not all leave centraal station at the same moment 
+  last_sent_request  ; keep track of the last request message I sent
   ] 
 
 ; added global variable : bus_number, bus_id_list, average distance travelled
 ; bus_deserving_stations: List of list of the bus id  of bus deserving station i //This variable is global but is constructed thanks to local knowledge ! (Blackboard system)
 ; hourly_passenger_location: memorize in a list of list the estimated number of passenger at a stop given the time (in hour)
 ; init_num_bus_per_line: for convienience and parameter optimization. this number is fixed 
-globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line]
+; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
+globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
+
+;Correct when deviate = the sattion where we are 
+;Correct some random bug 
+  
 
 to init-buses
+  ;constant 
   if(init_num_bus_per_line = 0)
   [set init_num_bus_per_line 2]
+  
+  if(message_overcrow_delay = 0)
+  [set message_overcrow_delay 30]
   
   ; Initialize your agents here.
   if bus_id mod 6 = 0 [set fixed_route [3 9 8 6 8 2]]
@@ -58,6 +68,13 @@ to init-buses
   if bus_id mod 6 = 3 [set fixed_route [3 4 10 13 23 14]]
   if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19]]
   if bus_id mod 6 = 5 [set fixed_route [3 16 11]]
+  
+  ;TEST: REMOVE
+  if bus_id = 35
+  [set color 0]
+  if bus_id = 36
+  [set color 86]
+  ;END TEST 
   
   ;set a delay so that the buses are equally distributed over the line 
   let line_length (compute-route-length fixed_route)
@@ -74,7 +91,16 @@ to init-buses
       set i (i + 1)
     ]
   ]
-  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id [] fixed_route)
+  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
+  
+  if overcrowded_station = 0
+  [
+    set overcrowded_station (list)
+  ]
+  if overcrowded_line = 0
+  [
+    set overcrowded_line (list)
+  ]
   
   set direction "GO"
   set route_index 1
@@ -94,7 +120,7 @@ to init-buses
   
   ;TEST FUNCTIONS 
   ;show (split "[1 2 3]/test/5" "/")
-  ;show (shortest-route2 0 5)
+  ;show (shortest-route2 11 11)
   ;let mess-id (build-m-id bus_id) 
   ;let mess (build-message bus_id mess-id "INFORM" "I am happy")
   ;show mess
@@ -257,9 +283,9 @@ to execute-actions
     if(drive_intention = "deserve")
     [   
       ; check whether a bus is in a bus stop
-      if current_stop = item route_index fixed_route [
+      if (current_stop = (item route_index fixed_route) ) [
         if(previous_stop != -1) [
-          set travelled_distance travelled_distance + get-distance previous_stop current_stop
+          set travelled_distance travelled_distance + my-get-distance previous_stop current_stop
         ]
         ;compute next stop
         let break? false
@@ -280,7 +306,7 @@ to execute-actions
       if current_stop = item route_index deviate_route 
       [
         if(previous_stop != -1) [
-          set travelled_distance (travelled_distance + get-distance previous_stop current_stop)
+          set travelled_distance (travelled_distance + my-get-distance previous_stop current_stop)
         ]
         
         ;update index and direction 
@@ -297,36 +323,4 @@ to execute-actions
   ]
 end
 
-; add each element of addList to the original
-to-report update-bus-deserving-stations[original _bus_id old_route new_route]
-  let removed_station (list); keep track of station removed
-  let added_station (list); keep track of station added
-  foreach old_route
-  [
-    if(not (member? ?  removed_station) ) 
-    [
-      ;retrieve the station list
-      let station_list (item ? original)
-      ;remove its id from this station
-      let item_index position bus_id station_list
-      let new_station_list (remove-item item_index station_list)
-      set original (replace-item ?  original new_station_list)
-      set removed_station lput ? removed_station
-    ]
-  ]
-  foreach new_route
-  [
-    if(not (member? ?  added_station) ) 
-    [
-       ;retrieve the station list
-      let station_list (item ? original)
-      ;add its id from this station
-      let new_station_list (lput bus_id station_list)
-      set original (replace-item ?  original new_station_list)
-      set added_station lput ? added_station
-    ]
-
-  ]
-  report original
-end
 

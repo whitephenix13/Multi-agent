@@ -2,8 +2,8 @@
 ;day_time given in ticks
 
 to-report travel-gain[my_bus_type route]
-  let mean_travel_cost 175000 
-  
+
+  let mean_time 420
   let cost_per_patch 0
   if my_bus_type = 1 
   [set cost_per_patch 1]
@@ -14,27 +14,27 @@ to-report travel-gain[my_bus_type route]
   
   let route_length (compute-route-length route)
     
-  report (-1 * mean_travel_cost * cost_per_patch * route_length)
+  report (-1 * mean_time * cost_per_patch * route_length)
 end 
 
-to-report passenger-gain[route day_time]
-  let mean_time 420
+to-report passenger-gain[route day_time _bus_deserving_stations]
+  let mean_travel_cost 175000 
 
   let time_importance 2
   let bus_speed 1
   let stop_per_person 4.25;mean number of stop per person 
   let distance_stops 6.32; mean distance between two stops
   
-  let expected_people (compute-expected-people route day_time);
+  let expected_people (compute-expected-people route day_time _bus_deserving_stations);
   
   let people_per_day 42776; the total number of people per day 
-  report (time_importance * mean_time * (stop_per_person * distance_stops) / bus_speed  * expected_people / people_per_day)
+  report (time_importance * mean_travel_cost * (stop_per_person * distance_stops) / bus_speed  * expected_people / people_per_day)
 end
 
-to-report heuristic[my_bus_type route day_time]
+to-report heuristic[my_bus_type route day_time _bus_deserving_stations]
   let H 0 
   let travel_g (travel-gain my_bus_type route)
-  let pass_g (passenger-gain route day_time)
+  let pass_g (passenger-gain route day_time _bus_deserving_stations)
   
   set H (pass_g + travel_g)
   report H 
@@ -117,7 +117,7 @@ to-report parse-hourly-passenger-location[]
   report matrix
 end
 
-to-report compute-expected-people[route day_time]
+to-report compute-expected-people[route day_time _bus_deserving_stations]
   ; Compute sum of people at stop / number of bus deserving this stop
   ;convert day_time that is in tick to hour time 
   let hour ((floor (day_time / 60) ) mod 24)
@@ -147,7 +147,7 @@ to-report compute-expected-people[route day_time]
         ;interpolate between current hour and next hour
         set num_pass_at_stop (a * num_pass_at_stop_h1 + b * num_pass_at_stop_h2)
         
-        let num_bus_deserving_stop (length (item ? bus_deserving_stations) )
+        let num_bus_deserving_stop (length (item ? _bus_deserving_stations) )
         set _sum (_sum + num_pass_at_stop / num_bus_deserving_stop)
         set encountered_stop lput ? encountered_stop
       ]

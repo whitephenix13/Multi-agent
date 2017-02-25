@@ -41,10 +41,10 @@ end
 to-report read-message[string]
  report (split string "/")
 end
-;Get information of !!read!! message 
+
 to-report get-sender[string]
   let m (read-message string)
-  report (item 0 m)
+  report read-from-string (item 0 m)
 end
 to-report get-m-id[string]
   let m (read-message string)
@@ -66,7 +66,8 @@ end
 to-report get-sender-information[mess]
   let m (read-message mess)
   let mess_id (get-m-id mess)
-  report (split mess_id "-")
+  let split_m  (split mess_id "-")
+  report (list (read-from-string (item 0 split_m)) (read-from-string(item 1 split_m)) )
 end
 
 ;retrieve message that are <= 3 ticks from current one. This is based on the following sending model: 
@@ -80,15 +81,22 @@ to-report retrieve-recent[_inbox _tick time_tol]
   set _inbox reverse _inbox
   let l (list)
   ;message in inbox is [tick, sender, message]
-  foreach(inbox)
+  let stop? false
+  let ind 0
+  while[ind < length(_inbox) and (stop? = false)]
   [
-    let m_tick (item 0 ?)
-    if( (m_tick - _tick) >= time_tol )
+    let m (item ind _inbox)
+    let m_tick (item 0 m)
+    ifelse ( (_tick - m_tick ) < time_tol )
+    [
+      set l lput (item 2 m) l  
+      set ind (ind + 1)  
+    ]
     [
       ;We are in the older message part, we can break
-      stop
+      set stop? true  
     ]
-    set l lput (item 2 ?) l    
+
   ]
   report l
 end
@@ -103,52 +111,46 @@ to-report filter-message[messages]
     let m ?
     let m_action_type (get-action-type m)
     let sender_info (get-sender-information m)
-    let sent_tick (read-from-string (item 1 sender_info))
+    let sent_tick  (item 1 sender_info)
     let break? false
-    
-    ;We only consider message that were sent in the previous tick
-    if( (ticks - sent_tick) = 1)
+   
+    if(m_action_type = "INFORM")
     [
-      if(m_action_type = "INFORM")
-      [
+      if( (ticks - sent_tick) = 1)[
         set l_inform lput ? l_inform
-        set break? true
-      ]
-      if(m_action_type = "REQUEST")
-      [
-        set l_request lput ? l_request 
-        set break? true       
-      ]
-      if(m_action_type = "REPLY")
-      [
-        set l_reply lput ? l_reply 
-        set break? true       
-      ]
-      if(m_action_type = "ACTION")
-      [
-        set l_action lput ? l_action  
-        set break? true      
-      ]
-      if(break? = false)
-      [
-        show ( word (word "WARNING: message action type is unknown: " m_action_type) (". Try INFORM / REQUEST / REPLY instead"))
-      ]
+        ]
+      set break? true
     ]
+    if(m_action_type = "REQUEST")
+    [
+      if( (ticks - sent_tick) = 1)[
+      set l_request lput ? l_request 
+      ] 
+      set break? true
+    ]
+    if(m_action_type = "REPLY")
+    [
+      if( (ticks - sent_tick) = 2)[
+      set l_reply lput ? l_reply 
+      ]
+      set break? true
+    ]
+    if(m_action_type = "ACTION")
+    [
+      if( (ticks - sent_tick) = 3)[
+      set l_action lput ? l_action  
+      ]    
+      set break? true 
+    ]
+    if(break? = false)
+    [
+      show ( word (word "WARNING: message action type is unknown: " m_action_type) (". Try INFORM / REQUEST / REPLY instead"))
+    ]
+    
   ]
   report (list l_inform l_request l_reply l_action)
 end
  
-to-report find-matching-REQUEST [message_list mess_id]
-  foreach message_list
-  [
-    let m_id (get-m-id ?) 
-    let m_action_type (get-action-type ?) 
-    if(m_id = mess_id and (m_action_type = "REQUEST") )
-    [
-      report ?
-    ]    
-  ]
-end
 ;build the content so that the bus apply  set belief_variable_name value
 to-report build-INFORM-content[var_name operator var_value]
   report word (word (word (word var_name ";") operator) ";") var_value
@@ -157,7 +159,7 @@ to-report build-REQUEST-content[var_name var_value treshold]
   report word (word (word (word var_name ";") var_value) ";") treshold
 end
 to-report build-REPLY-content[value]
-  report value
+  report word value ""
 end
 to-report build-ACTION-content[var_name var_value]
   report word (word var_name ";") var_value
@@ -176,8 +178,7 @@ to-report read-REQUEST-content[mess]
   let treshold (read-from-string (item 2 m))
   report (list var_name var_value treshold)
 end
-;assumption: you only reply to a request
-;return: true if reply is positif, false  otherwise 
+
 to-report read-REPLY-content[mess]
   report (read-from-string mess)
 end

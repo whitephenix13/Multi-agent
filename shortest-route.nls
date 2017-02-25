@@ -54,7 +54,7 @@ to-report shortest-route2 [start-stop end-stop]
     ;loop over all neighboors
     foreach (item min-val-index graph)
     [
-      let new-dist ((item min-val-index dist) + (get-distance min-val-index ? ))
+      let new-dist ((item min-val-index dist) + (my-get-distance min-val-index ? ))
       if  (((new-dist) < (item ? dist)) )[
       set prev(replace-item ? prev min-val-index)
       set dist (replace-item ? dist new-dist)
@@ -131,7 +131,7 @@ to-report total-distance[route]
   let res 0
   foreach route[
     if(i != 0) [
-      set res (res + get-distance item i route item (i - 1) route)
+      set res (res + my-get-distance item i route item (i - 1) route)
     ]
     set i (i + 1)
   ]
