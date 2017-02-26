@@ -1,0 +1,172 @@
+;usefull functions
+to-report equal-route [route1 route2]
+  if((length route1) != (length route2))
+  [report false]
+  let i 0
+  foreach(route1)
+  [
+    if(? != (item i route2))
+    [report false]
+    set i (i + 1)
+  ]
+  report true  
+end
+
+;check if all stations of route1 or in route2
+to-report equal-route-stops[route1 route2]
+  foreach(route2)
+  [
+     if(not (member? ? route1) )
+     [report false]
+  ]
+  report true
+end
+
+to-report compute-route-length [route]
+  let leng 0 
+  let prev_stop -1
+  foreach route
+  [
+    if( prev_stop != -1)
+    [set leng (leng + (my-get-distance prev_stop ?) )]
+    set prev_stop ?
+  ]
+  report leng
+end
+
+to-report get-next-direction-index[b_id]
+  let next_direction -1
+  let next_index  -1
+  ask buses with[bus_id = b_id]
+  [
+    ;default value
+    set next_direction direction 
+    set next_index route_index 
+    
+    ifelse(next_stop = -1)
+    [
+      if(drive_intention = "deserve")
+      [
+        let break? false
+        ;update index 
+        if(direction = "GO" and (break? = false)) 
+        [
+          ;if we are at the last top in GO direction
+          ifelse(route_index = (length(fixed_route)) - 1)
+          [
+            set next_direction "RETURN"
+            set next_index (route_index - 1)
+          ]
+          [set next_index (route_index + 1)]
+          set break? true
+        ]
+        
+        if(direction = "RETURN" and (break? = false)) 
+        [
+          ;if  we are at the last top in RETURN direction
+          ifelse(route_index = 0)
+          [
+            set next_direction "GO"
+            set next_index (route_index + 1)
+          ]
+          [set next_index (route_index - 1)]
+          set break? true
+        ]
+      ]
+      
+      if(drive_intention = "deviate")
+      [
+        set next_index (route_index + 1)
+      ]
+    ]
+    [set next_index route_index]
+    
+  ]
+  report (list next_direction next_index )
+end
+
+to-report station_delay_ok [station_delays station_check _ticks]
+  foreach station_delays
+  [
+    if( (item 0 ?) = station_check)
+    [
+      if ( ( _ticks -(item 1 ?)) < message_overcrow_delay)
+      [
+        report false
+      ]
+    ]
+  ]
+  report true
+end 
+
+to-report line_delay_ok [line_delay line_check _ticks]
+  foreach line_delay
+  [
+    if( equal-route (item 0 ?) line_check)
+    [
+      if ( ( _ticks -(item 1 ?)) < message_overcrow_delay)
+      [
+        report false
+      ]
+    ]
+  ]
+  report true
+end
+
+to-report clean_delay_var [var _ticks]
+  let index_remove (list)
+  foreach var
+  [
+    if ( ( _ticks -(item 1 ?)) < message_overcrow_delay)
+    [
+        set index_remove lput ? index_remove
+   ]
+  ]
+  
+  foreach index_remove
+  [
+    let index (position ? var)
+    set var remove-item index var 
+  ]
+  report var
+end
+
+; add each element of addList to the original
+to-report update-bus-deserving-stations[original _bus_id new_route]
+  let added_station (list); keep track of station added
+  
+  ;remove all station deserved by this bus
+  let ind 0
+  foreach original
+  [
+    if(member? _bus_id  ? ) 
+    [
+      ;remove its id from this station
+      let station_list ? 
+      let item_index position bus_id station_list
+      let new_station_list (remove-item item_index station_list)
+      set original (replace-item ind  original new_station_list)
+    ]
+    set ind (ind + 1 )
+  ]
+  foreach new_route
+  [
+    if(not (member? ?  added_station) ) 
+    [
+       ;retrieve the station list
+      let station_list (item ? original)
+      ;add its id from this station
+      let new_station_list (lput  _bus_id station_list)
+      set original (replace-item ?  original new_station_list)
+      set added_station lput ? added_station
+    ]
+
+  ]
+  report original
+end
+
+to-report my-get-distance[bs1 bs2]
+  ifelse bs1 = bs2
+  [report 0]
+  [report get-distance bs1 bs2]
+end
