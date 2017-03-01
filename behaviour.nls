@@ -51,7 +51,17 @@ to update_comm_intention [f_messages]
     set comm_intention "disable"
     set break? true
   ]
+  ;TODO: check if in deserve ;ode: see below
+  ; only apply if at a station:       let check_stations? (member? current_stop current_route) 
+  ;check for uncrowded, if find one, set break? true
+  ;add two variables  in agent (to the bus )to keep track of the station you want to drop and the delta heuristic value for it 
+  ;calculate current heuristic and heuristic zhen station removed 
+  ; send message using my-send-message 
   
+  ;send inform where var value is the delta heuristic 
+  ; in apply inform you get all request for dropping this station 
+  ; if number of infor;m + 1 < num bus deserving station : drop staion, do your stuff 
+  ; otherzise, sort inforlm by value ( ADD YOUR VALUE TOO) and if looser, dont drop  
   if( comm_intention = "none" and (not break?))
   [
     let current_route -1
@@ -192,7 +202,9 @@ to update-message-intentions [f_messages]
 end
 
 to applyInform[var_name operator var_value]
+  ;TODO
   ;execute-set var_name var_value
+  ;if drop station: UPDATE BUS DESERVING STATIONS
 end
 
 to applyRequest[m_request]
