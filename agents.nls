@@ -21,7 +21,7 @@ buses-own [
   
   ;Behavioural variables 
   desire          ; Can be "deserve" (deserve its line) "maintain" (assure that rarely used station are deserved) "connect" (assure connections between several lines)
-  addbus_intention; Can be "addinit"(add buses at the beginning) "add" (add bus during runtime) "none"
+  addbus_intention; Can be "addinit"(add buses at the beginning) "add" (add bus during runtime) "none" 
   drive_intention ; Can be "wait"(do not move) "deserve"(deserve its own line) "pick_extra"(pick passenger from another line) "drop_extra" (drop passenger to another line) "deviate"
   comm_intention  ; Can be "send"(send a message) "disable" (can't send message REQUEST or INFORM) "none" (do nothing)
   message_content         ; Set this variable in behaviour.nls when the bus wants to send a message. This will be the message sent.
@@ -35,6 +35,19 @@ buses-own [
   station_to_drop    ; Id of the station that a bus wants to drop. If none, set to -1
   station_to_drop_heur; Variation of heuristics obtained if the bus drops the station
   last_reply_time     ; Keep track of the tick of the last replied message. Can not drop a station if I replied during this frame pr the previous one 
+    
+  add_bus_index      ; keep track of the index of the bus we added. This is used to send him a message to initialize it; = to -1 if none
+  add_size           ; The desired size of the bus we want to add 
+  
+  add_fixed_route    ; variable to init a new bus
+  add_deviate_route  ; variable to init a new bus
+  add_start_delay    ; variable to init a new bus
+  add_direction      ; variable to init a new bus
+  add_route_index    ; variable to init a new bus
+  add_desire         ; variable to init a new bus
+  add_drive_intention; variable to init a new bus
+  add_comm_intention ; variable to init a new bus
+  add_addbus_intention; variable to init a new bus
     
   new_drive_intention; Used when the bus is replying to a message. This intention will be his new drive_intention if he "wins" the request.
   deviate_route      ; This is the route that the bus will follow when he is deviating from its main fixed_route
@@ -57,82 +70,91 @@ globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_lo
   
 
 to init-buses
-  ;constant 
-  if(init_num_bus_per_line = 0)
-  [set init_num_bus_per_line 2]
-  
-  if(message_overcrow_delay = 0)
-  [set message_overcrow_delay 30]
-  
-  ; Initialize your agents here.
-  if bus_id mod 6 = 0 [set fixed_route [3 9 8 6 8 2]]
-  if bus_id mod 6 = 1 [set fixed_route [3 20 12 15 18]]
-  if bus_id mod 6 = 2 [set fixed_route [3 20 21 22 0]]
-  if bus_id mod 6 = 3 [set fixed_route [3 4 10 13 23 14]]
-  if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19]]
-  if bus_id mod 6 = 5 [set fixed_route [3 16 11]]
-  
-  ;TEST: REMOVE
-  if bus_id = 35
-  [set color 0]
-  if bus_id = 36
-  [set color 86]
-  ;END TEST 
-  
-  ;set a delay so that the buses are equally distributed over the line 
-  let line_length (compute-route-length fixed_route)
-  let nb_bus_on_this_line (floor ((bus_id - 24) / 6) )
-  set start_delay ( nb_bus_on_this_line * 2 * line_length / init_num_bus_per_line)
-  
-  if(bus_deserving_stations = 0 )
+  ;bus comes from bus_init 
+  ifelse(ticks < 3)
   [
-    set bus_deserving_stations (list)
-    let i 0 
-    while [i < 24]
+      ;constant 
+    if(init_num_bus_per_line = 0)
+    [set init_num_bus_per_line 2]
+    
+    if(message_overcrow_delay = 0)
+    [set message_overcrow_delay 30]
+    
+    if overcrowded_station = 0
     [
-      set bus_deserving_stations lput (list) bus_deserving_stations
-      set i (i + 1)
+      set overcrowded_station (list)
     ]
+    if overcrowded_line = 0
+    [
+      set overcrowded_line (list)
+    ]
+    
+    
+     ; This list contains the topology of the entire network of bus stops, which is known to all agents. You can use this, for instance, to calculate the shortest path between two bus stops.
+    set graph [[22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13] [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18] [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]]
+    
+    ; Initialize your agents here.
+    if bus_id mod 6 = 0 [set fixed_route [3 9 8 6 8 2]]
+    if bus_id mod 6 = 1 [set fixed_route [3 20 12 15 18]]
+    if bus_id mod 6 = 2 [set fixed_route [3 20 21 22 0]]
+    if bus_id mod 6 = 3 [set fixed_route [3 4 10 13 23 14]]
+    if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19]]
+    if bus_id mod 6 = 5 [set fixed_route [3 16 11]] 
+    
+    ;set a delay so that the buses are equally distributed over the line 
+    let line_length (compute-route-length fixed_route)
+    let nb_bus_on_this_line (floor ((bus_id - 24) / 6) )
+    set start_delay ( nb_bus_on_this_line * 2 * line_length / init_num_bus_per_line)
+    
+    if(bus_deserving_stations = 0 )
+    [
+      set bus_deserving_stations (list)
+      let i 0 
+      while [i < 24]
+      [
+        set bus_deserving_stations lput (list) bus_deserving_stations
+        set i (i + 1)
+      ]
+    ]
+    set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
+    
+    set direction "GO"
+    set route_index 1
+    
+    if bus_type = 1 [set bus_capacity 12]
+    if bus_type = 2 [set bus_capacity 60]
+    if bus_type = 3 [set bus_capacity 150]
+    
+    set desire "deserve" 
+    set drive_intention "deserve" 
+    set comm_intention "none"
+    set addbus_intention "none"
+    
+    set message_receivers (list)
+   
   ]
-  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
-  
-  if overcrowded_station = 0
+  ;bus was created because another bus asked for it. In order to init, wait for him to receive an init message 
   [
-    set overcrowded_station (list)
-  ]
-  if overcrowded_line = 0
-  [
-    set overcrowded_line (list)
-  ]
-  
-  set direction "GO"
-  set route_index 1
-  
-  if bus_type = 1 [set bus_capacity 12]
-  if bus_type = 2 [set bus_capacity 60]
-  if bus_type = 3 [set bus_capacity 150]
+    ;do nothing until receive an init message 
+    set fixed_route []
+    set start_delay 0
+    ;do not forget to update  set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
 
-  set desire "deserve" 
-  set drive_intention "deserve" 
-  set comm_intention "none"
-  set addbus_intention "none"
-  
-  set message_receivers (list)
-  ; This list contains the topology of the entire network of bus stops, which is known to all agents. You can use this, for instance, to calculate the shortest path between two bus stops.
-  set graph [[22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13] [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18] [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]]
-  
-  ;TEST FUNCTIONS 
-  ;show (split "[1 2 3]/test/5" "/")
-  ;show (shortest-route2 11 11)
-  ;let mess-id (build-m-id bus_id) 
-  ;let mess (build-message bus_id mess-id "INFORM" "I am happy")
-  ;show mess
-  ;show (read-message mess)
-  ;show bus_id_list
-  ;show travelled_distance
-  ;show find-way-to-route 3 [0 11]
-  ;show best-route 0 [11 17 10 13]
-  ;show best-route 0 [3 20 12 18] 
+    set direction "GO"
+    set route_index -1
+    
+    if bus_type = 1 [set bus_capacity 12]
+    if bus_type = 2 [set bus_capacity 60]
+    if bus_type = 3 [set bus_capacity 150]
+    
+    set desire "" 
+    set drive_intention "" 
+    set comm_intention ""
+    set addbus_intention "init" ; flag to ask for initialization
+    
+    set message_receivers (list)
+  ]
+
 end
 
 to drop-passenger[current_route]
@@ -275,11 +297,13 @@ to execute-actions
     if(addbus_intention = "add")
     [
       ; add more bus as time increases
-      add-bus(3)
+      add-bus(add_size)
       set bus_id_list lput (bus_number + 24) bus_id_list
       
-      set bus_number bus_number + 1
+      set add_bus_index (bus_number + 24)
       
+      set bus_number bus_number + 1
+      set addbus_intention "none"
     ]
     
     

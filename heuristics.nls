@@ -72,7 +72,7 @@ to-report check-uncrowded-station [route current_ticks]
   ;TODO: find min value of l_value: "let min_val min l"
   ;TODO: find min index value of l_value: "let index position min_val l_value"  
   ;TODO: find corresponding station_id and "set res station_id"
-  ;TODO Reports a station to remove or -1 of NONE 
+  ;TODO Reports a station to remove or -1 of NONE :WARNING: NEVER REMOVE CENTRAAL STATION (index=3) FIND ANOTHER STATION IF THE MIN IS CENTRAAL
   report res
 end
 

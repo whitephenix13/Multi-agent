@@ -6,6 +6,7 @@ to update_addbus_intention
   [
     set addbus_intention "none"
   ]
+  ;other add option is in apply reply
 end 
 
 to update_desire
@@ -72,12 +73,21 @@ to update_comm_intention [f_messages]
                    ;TODO: set station_to_drop_heur
                
                    ;TODO: build message_content using build-INFORM-content task_name (list var1 var2 ... varn) where var are station_id and delta_heuristic (or more if necessary)
+                   ;TODO: let message_id (build-m-id bus_id)
                    ;TODO: build message build-message bus_id message_id "INFORM" message_content
                    ;TODO: find all buses that deserve this station using bus_deserving_stations
                    ;TODO: send a the message using  my-send-message bus_id_to_send message for all buses to whom you have to send
       
                    ;TODO set break? true
   
+  if (add_bus_index != -1)
+  [
+    ; send an init message to the bus
+    let content (build-INFORM-content "init" (list add_fixed_route add_deviate_route add_start_delay add_direction add_route_index add_desire add_drive_intention add_comm_intention add_addbus_intention))
+    let message_id (build-m-id bus_id)
+    let message (build-message bus_id message_id "INFORM" content)
+    my-send-message add_bus_index message
+  ]
   if( comm_intention = "none" and (not break?))
   [
     let current_route -1
@@ -216,12 +226,32 @@ to applyInform[m_inform]
   ;TODO: Alex LELL 
   ;TODO: create list to memorize the delta heuristic for drop
   ;TODO: create list (same order as previous one! ) to memorize the bus_id for drop
-  ;TODO: loop over all message 
-      ;TODO: parse them using read-INFORM-content ? , you will get a list where the first element is the task name, all the following one are the var values
+  
+  foreach m_inform
+  [ 
+    ;parse message and get a list where the first element is the task name, all the following one are the var values AS A STRING ; (use "read-from-string str" to get an integer/list ... of the list 
+    let list_infos (read-INFORM-content ?)
+    let task_name (item 0 list_infos)
+    if task_name = "init"
+    [
+      set fixed_route add_fixed_route
+      set deviate_route add_deviate_route
+      set start_delay add_start_delay
+      set direction add_direction
+      set route_index add_route_index
+      set desire add_desire
+      set drive_intention add_drive_intention
+      set comm_intention add_comm_intention
+      set addbus_intention add_addbus_intention
+      
+      if(drive_intention = "deserve")
+      [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
+    ] 
       ;TODO: check if task_name is nameOfTheTaskForDrop 
           ;TODO: check if station_id of the message is the same as station_to_drop
               ;TODO add bus id to list of bus_id_drop 
               ;TODO add d_heuristic to list of d_heur_drop 
+  ]
   ;TODO if at least one bus does not want to drop the station I want to drop (check length of drop_list +1 (!!!! +1 to count myself) and bus_deserving_stations)
       ;TODO: compute new route (think carefully at where the station you are dropping is, you might need to change the route_index and direction values)
       ;TODO: compute new bus_deserving_station
@@ -237,6 +267,7 @@ to applyInform[m_inform]
          ;TODO: set station_to_drop to -1
          ;TODO: set station_to_drop_heur to 0 
          ;TODO: drop station 
+  
 
 end
 
@@ -374,6 +405,28 @@ end
 
 to applyReply[m_reply f_messages]
   let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
+  
+  ;if received no reply, check if should add a bus, if that is the case, the bus will only be added at the end of the tick: send a message at next tick to this bus to initialize it
+  ;TODO: Rezka
+  ;TODO:if length m_reply =0 and drive_intention = "deserve"
+     ;TODO estimate needed bus size: estimate number of people to pick during a route loop, use mean_time_between_stop = 6.25/1 (see heuristics) * nb_stop (time for route)
+     ; then estimate the number of people expected for the next hour and multiply by expected_route_time/60 (if expected_route_time<60, toherwise consider several hours...)
+     ;TODO: estimate bus addition gain = total bus heuristic (calculate from now until the end of the run, ie ticks =1440)   bus init cost *mean_time(=420)
+     ;TODO: if addition gain > 0 
+        ;TODO: set addbus_intention "add"
+        ;TODO: set good parameter for creation:
+        ;TODO: set add_size ;1 or 2 or 3
+        ;TODO: set add_fixed_route fixed_route ; same route as mine
+        ;TODO: set add_deviate_route ; if member? 3 fixed_route (if centraal is a member of the fixed route), set this to find-way-to-route 3 fixed_route, else (list)
+        ;TODO: set add_start_delay ; if needed to add a delay. If no idea what to do, set it to 0 
+        ;TODO: set add_route_index; if centraal in fixed route: [compute "let ind position 3 fixed_route". if ind <length(fixed_route)- 1, set add_route_index (ind + 1) and set add_direction "GO"
+        ; else set add_route_index (ind - 1)  and set add_direction "RETURN" ], else set it to 0 and set add_direction to "GO"
+        ;TODO: set add_direction ; see above 
+        ;TODO: set add_desire ; mostly "deserve", can also be "connect line"
+        ;TODO: set add_drive_intention; if has to deviate (ie: add_deviate_route is not null), set to "deviate" else, set to "deserve"
+        ;TODO: set add_comm_intention; set to "none"
+        ;TODO: set add_addbus_intention; set to "none"
+        
   foreach m_reply
   [
     let content get-content ?

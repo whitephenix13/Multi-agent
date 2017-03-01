@@ -172,17 +172,9 @@ end
 to-report read-INFORM-content[mess]
   let m (split mess ";" )
   let res (list)
-  let index 0
   foreach m
   [
-      ifelse(index = 0)
-      [
-        set res lput ? res
-      ]
-      [
-        set res lput (read-from-string ?) res
-      ]
-      set index (index + 1)
+     set res lput ? res
   ]
   report res
 end
