@@ -32,14 +32,17 @@ buses-own [
   overcrowded_line   ; List of [route, ticks when message received]: same as before
   message_to_send    ; if comm_intention = "send", the bus will send this message to message_receivers
   message_receivers  ; List of all bus id to whom the message has to be sent 
-   
-  
+  station_to_drop    ; Id of the station that a bus wants to drop. If none, set to -1
+  station_to_drop_heur; Variation of heuristics obtained if the bus drops the station
+  last_reply_time     ; Keep track of the tick of the last replied message. Can not drop a station if I replied during this frame pr the previous one 
+    
   new_drive_intention; Used when the bus is replying to a message. This intention will be his new drive_intention if he "wins" the request.
   deviate_route      ; This is the route that the bus will follow when he is deviating from its main fixed_route
   new_fixed_route    ; This is the new fixed route that the bus will follow when we wins the request. He might first have to take the deviate route in order to reach this one.
   
   start_delay        ; set a delay to initiated bus so that they do not all leave centraal station at the same moment 
   last_sent_request  ; keep track of the last request message I sent
+
   ] 
 
 ; added global variable : bus_number, bus_id_list, average distance travelled

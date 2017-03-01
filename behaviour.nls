@@ -51,17 +51,33 @@ to update_comm_intention [f_messages]
     set comm_intention "disable"
     set break? true
   ]
-  ;TODO: check if in deserve ;ode: see below
-  ; only apply if at a station:       let check_stations? (member? current_stop current_route) 
-  ;check for uncrowded, if find one, set break? true
-  ;add two variables  in agent (to the bus )to keep track of the station you want to drop and the delta heuristic value for it 
-  ;calculate current heuristic and heuristic zhen station removed 
-  ; send message using my-send-message 
+  ;TODO: ALex LELL
+  ;TODO: compute the current_route using the same type of code as below
+  ;TODO if current_route != -1
+     ;TODO check if the bus is at a station he deserves (see check_stations? below) and that he is not replying to a message ( (ticks - last_reply_time) > 2, ie I did not send a reply 
+     ;during update-message-intentions
+        ;TODO: check for undercrowded station using the function in heuristic
+        ;TODO: if station_id != -1 ; ie: find one 
+               
+               ;TODO calculate current heuristic (see apply request) 
+               
+               ;TODO: calculate new route (use best-drop-station)
+               ;TODO: calculate new drive_intention (see apply request)
+               ;TODO: use the above to calculate new heuristic 
+               
+               ;TODO: calculate delta heuristic 
+               
+               ;TODO: if delta heuristic > 0
+                   ;TODO: set station_to_drop
+                   ;TODO: set station_to_drop_heur
+               
+                   ;TODO: build message_content using build-INFORM-content task_name (list var1 var2 ... varn) where var are station_id and delta_heuristic (or more if necessary)
+                   ;TODO: build message build-message bus_id message_id "INFORM" message_content
+                   ;TODO: find all buses that deserve this station using bus_deserving_stations
+                   ;TODO: send a the message using  my-send-message bus_id_to_send message for all buses to whom you have to send
+      
+                   ;TODO set break? true
   
-  ;send inform where var value is the delta heuristic 
-  ; in apply inform you get all request for dropping this station 
-  ; if number of infor;m + 1 < num bus deserving station : drop staion, do your stuff 
-  ; otherzise, sort inforlm by value ( ADD YOUR VALUE TOO) and if looser, dont drop  
   if( comm_intention = "none" and (not break?))
   [
     let current_route -1
@@ -180,12 +196,7 @@ to update-message-intentions [f_messages]
   let m_reply (item 2 all_filtered)
   let m_action (item 3 all_filtered) 
   
-  foreach m_inform
-  [
-    let content get-content ?
-    let info (read-INFORM-content content)
-    applyInform (item 0 info) (item 1 info) (item 2 info)
-  ]
+  applyInform m_inform
   
   applyRequest m_request
   
@@ -200,11 +211,33 @@ to update-message-intentions [f_messages]
   ]
   
 end
+;TODO: check if not probelm with action message 
+to applyInform[m_inform]
+  ;TODO: Alex LELL 
+  ;TODO: create list to memorize the delta heuristic for drop
+  ;TODO: create list (same order as previous one! ) to memorize the bus_id for drop
+  ;TODO: loop over all message 
+      ;TODO: parse them using read-INFORM-content ? , you will get a list where the first element is the task name, all the following one are the var values
+      ;TODO: check if task_name is nameOfTheTaskForDrop 
+          ;TODO: check if station_id of the message is the same as station_to_drop
+              ;TODO add bus id to list of bus_id_drop 
+              ;TODO add d_heuristic to list of d_heur_drop 
+  ;TODO if at least one bus does not want to drop the station I want to drop (check length of drop_list +1 (!!!! +1 to count myself) and bus_deserving_stations)
+      ;TODO: compute new route (think carefully at where the station you are dropping is, you might need to change the route_index and direction values)
+      ;TODO: compute new bus_deserving_station
+      ;TODO: set station_to_drop to -1
+      ;TODO: set station_to_drop_heur to 0 
+      ;TODO: drop station 
+  ;TODO: else
+      ;TODO: add my id to the list (if not done) and my d_heur to the list (if not done) using the one I memorized in station_to_drop_heur
+      ;TODO: compute min d_heuristic and corresponding bus_id 
+      ;TODO: if I am not the min, I can drop a station: 
+         ;TODO: compute new route (think carefully at where the station you are dropping is, you might need to change the route_index and direction values)
+         ;TODO: compute new bus_deserving_station
+         ;TODO: set station_to_drop to -1
+         ;TODO: set station_to_drop_heur to 0 
+         ;TODO: drop station 
 
-to applyInform[var_name operator var_value]
-  ;TODO
-  ;execute-set var_name var_value
-  ;if drop station: UPDATE BUS DESERVING STATIONS
 end
 
 to applyRequest[m_request]
@@ -331,6 +364,9 @@ to applyRequest[m_request]
       ;send the message 
       my-send-message best_sender_id reply_message
       show word (word (word (word "send reply" best_sender_id) reply_message) " " )ticks
+      
+      ;memorize the tick :
+      set last_reply_time ticks
     ]
   ]
 end

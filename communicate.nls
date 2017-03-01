@@ -152,8 +152,13 @@ to-report filter-message[messages]
 end
  
 ;build the content so that the bus apply  set belief_variable_name value
-to-report build-INFORM-content[var_name operator var_value]
-  report word (word (word (word var_name ";") operator) ";") var_value
+to-report build-INFORM-content[task_name list_var_value]
+  let res task_name
+  foreach list_var_value
+  [
+    set res (word( word res ";") ?)
+  ]
+  report res
 end
 to-report build-REQUEST-content[var_name var_value treshold]
   report word (word (word (word var_name ";") var_value) ";") treshold
@@ -166,10 +171,20 @@ to-report build-ACTION-content[var_name var_value]
 end
 to-report read-INFORM-content[mess]
   let m (split mess ";" )
-  let var_name (item 0 m)
-  let operator (item 1 m)
-  let var_value (read-from-string (item 2 m))
-  report (list var_name operator var_value)
+  let res (list)
+  let index 0
+  foreach m
+  [
+      ifelse(index = 0)
+      [
+        set res lput ? res
+      ]
+      [
+        set res lput (read-from-string ?) res
+      ]
+      set index (index + 1)
+  ]
+  report res
 end
 to-report read-REQUEST-content[mess]
   let m (split mess ";" )

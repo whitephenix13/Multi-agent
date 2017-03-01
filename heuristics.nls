@@ -57,19 +57,23 @@ to-report check-overcrowded-station [bus_stop]
   report res
 end
 
-to-report check-uncrowded-station []
-  ;TODO Reports a station to remove
-  ; globals(bus_deserving_stations) returns list of list of busIDs call (station id)
-  ; if hourly_passenger_location = 0 (only nonzero if heuristic was called first)
+to-report check-uncrowded-station [route current_ticks]
+  ;TODO: Alex LELL
+  let tol 30 ; TODO: manually tune this 
+  let l_id (list)
+  let l_value (list)
+  let res -1
+  ;TODO: if hourly_passenger_location = 0 (only nonzero if heuristic was called first)
   ;       report (list)
-  ; item stationID (item  hour hourly_passenger_location) => # of passengers @ station
-  ; (list stationID value)
-  ; set l lput value l 
-  ; list of values, size 24 , init with huge number
-  ;let best_val min l 
-  ;let index_best_val position best_val l
-  ; don't remove station if bus is only bus on line
-  ; also make sure to return empty list when there is no station to be removed
+  ;TODO: foreach station in route
+         ;TODO: get expected number of people per bus for the next hour using "compute-expected-people[route current_ticks bus_deserving_stations]"
+         ;TODO: if expected number of people is under tolerance and length(bus_deserving_stations) > 1 ;ie: I'm not the only bus 
+               ;TODO add station_id and expected people to the list : "set l_id lput station_id  l_id" and "set l_value lput expected_people_to_add  l_value"
+  ;TODO: find min value of l_value: "let min_val min l"
+  ;TODO: find min index value of l_value: "let index position min_val l_value"  
+  ;TODO: find corresponding station_id and "set res station_id"
+  ;TODO Reports a station to remove or -1 of NONE 
+  report res
 end
 
 
