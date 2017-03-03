@@ -96,6 +96,18 @@ to-report check-overcrowded-line [bus_route]
   report res
 end
 
+to-report not-abandoning-station[_cur_route _n_route]
+  foreach _cur_route
+  [
+    if ((length(item ? bus_deserving_stations)) = 1)
+    [
+      if ((member? ? _n_route) = false)
+      [report false]
+    ] 
+  ]
+  report true
+end
+
 to-report remaining-bus-capacity [b_id]
   let remaining_seat 0
   ask buses with [bus_id = b_id] [
@@ -106,17 +118,6 @@ to-report remaining-bus-capacity [b_id]
   report remaining_seat
 end
 
-; calculate average travelled distance
-to-report calculate-average-travelled-distance
-  let average_distance 0
-  foreach bus_id_list [
-    ask buses with [bus_id = ?] [
-      set average_distance average_distance + travelled_distance
-    ]
-  ]
-  if(length(bus_id_list) != 0) [ set average_distance (average_distance / length(bus_id_list)) ]
-  report average_distance
-end
 
 to-report parse-hourly-passenger-location[]
   file-open "hourly_passengers_location.csv"

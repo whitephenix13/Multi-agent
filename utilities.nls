@@ -34,16 +34,17 @@ to-report compute-route-length [route]
   report leng
 end
 
-to-report get-next-direction-index[b_id]
+to-report get-next-direction-index[b_id get_next_next]
   let next_direction -1
   let next_index  -1
+  ;WARNING, we only use the ask buses because we can not give the current bus of the "to procedure" as parameter
   ask buses with[bus_id = b_id]
   [
     ;default value
     set next_direction direction 
     set next_index route_index 
     
-    ifelse(next_stop = -1)
+    ifelse(next_stop = -1 or (next_stop = false) or (get_next_next = true))
     [
       if(drive_intention = "deserve")
       [
@@ -57,10 +58,11 @@ to-report get-next-direction-index[b_id]
             set next_direction "RETURN"
             set next_index (route_index - 1)
           ]
-          [set next_index (route_index + 1)]
-          set break? true
-        ]
-        
+          [
+            set next_index (route_index + 1)]
+            set break? true
+          ]
+
         if(direction = "RETURN" and (break? = false)) 
         [
           ;if  we are at the last top in RETURN direction
@@ -69,9 +71,10 @@ to-report get-next-direction-index[b_id]
             set next_direction "GO"
             set next_index (route_index + 1)
           ]
-          [set next_index (route_index - 1)]
-          set break? true
-        ]
+          [
+            set next_index (route_index - 1)]
+            set break? true
+          ]
       ]
       
       if(drive_intention = "deviate")
@@ -169,4 +172,64 @@ to-report my-get-distance[bs1 bs2]
   ifelse bs1 = bs2
   [report 0]
   [report get-distance bs1 bs2]
+end
+
+to-report get_buses_with_different_route[bus_route]
+  let res bus_id_list
+  ;buses that have the same route as the bus_id 
+  let same_route_bus (list)
+  let first_loop? true
+  foreach bus_route
+  [
+    ;memorize buses that so far have the same route 
+    let temp (list)
+    ; get bus id list at this stop
+    let bus_deserving_station_ids (item ? bus_deserving_stations)
+    foreach(bus_deserving_station_ids)
+    [
+        ifelse(first_loop? = true)
+        [
+          set temp lput ? temp
+        ]
+        [
+          ;the bus needed to be to the previous list to ensure the fact that ALL the stops are the same 
+          if(member? ? same_route_bus)
+          [set temp lput ? temp]
+        ]
+        ;actualize the same_route_bus 
+        set same_route_bus temp
+    ]
+    set first_loop? false
+  ]
+  
+  ;remove buses that have the same route 
+  foreach same_route_bus
+  [
+    let index (position ?  res)  
+    set res (remove-item index res)
+  ]
+  report res
+end
+
+to-report getBuses_without_this_stop[bus_stop]
+  let res bus_id_list
+  let bus_deserving_station_ids (item bus_stop bus_deserving_stations)
+  foreach bus_deserving_station_ids
+  [
+    let index (position ?  res)  
+    set res (remove-item index res)
+  ]
+  report res
+end
+
+to-report compute-distance-to-stop[bus_x bus_y next_stop_id]
+  let res 0
+  let nsx 0
+  let nsy 0
+  ask bus_stop next_stop_id [
+      set nsx xcor
+      set nsy ycor
+    ]
+  set res sqrt (((nsx - bus_x) ^ 2) + ((nsy - bus_y) ^ 2))
+  report res
 end

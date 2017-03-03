@@ -88,6 +88,7 @@ to-report find-way-to-route[current-stop route]
     let d_short total-distance short
     if(shortest_distance > d_short) [
       set res short
+      set shortest_distance d_short
     ]
   ]
   report res

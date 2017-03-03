@@ -27,8 +27,16 @@ to update_drive_intention
       set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id new_fixed_route)
       
       set fixed_route new_fixed_route
-      set route_index position (item (length(deviate_route) - 1 ) deviate_route) new_fixed_route
-      set direction "GO"
+      let temp_route_index position (item (length(deviate_route) - 1 ) deviate_route) new_fixed_route
+      ifelse(temp_route_index = ( (length new_fixed_route) - 1) )
+      [
+        set route_index (temp_route_index - 1)
+        set direction "RETURN"
+      ]
+      [
+        set route_index (temp_route_index + 1)
+        set direction "GO"
+      ]
       set drive_intention "deserve"  
     ]
   ]
@@ -121,21 +129,15 @@ to update_comm_intention [f_messages]
           set message_to_send "" 
           
           ;Send message to every bus does not already have all of my stop in his line
-          foreach bus_id_list [
-            let bus_route -1
-            ask buses with[bus_id = ?] [set bus_route fixed_route]
-            if( (equal-route-stops current_route bus_route) = false)
-            [
-              set message_receivers lput ? message_receivers
-            ]
-          ]
+          set message_receivers (get_buses_with_different_route current_route)
+   
           let treshold 0 ; if the delta heuristic of the bus is >0 then the bus can respond to the request
           let message_cont (build-REQUEST-content "overcrowded_line" current_route treshold)
           let mess_id (build-m-id bus_id)
           set message_to_send (build-message bus_id mess_id "REQUEST" message_cont)
           set last_sent_request message_to_send
           
-          show word (word (word (word "send request" "") message_to_send) " " ) ticks
+          ;show word (word (word (word "send request" "") message_to_send) " " ) ticks
           
           ;memorize that a request was sent for this line 
           ;first: clean var
@@ -160,21 +162,15 @@ to update_comm_intention [f_messages]
           set message_to_send "" 
           
           ;send message to buses that don't have this stop in their route
-          foreach bus_id_list [
-            let bus_route -1
-            ask buses with[bus_id = ?] [set bus_route fixed_route]
-            if(not ( member? current_stop bus_route) )
-            [
-              set message_receivers lput ? message_receivers
-            ]
-          ]
+          set message_receivers (getBuses_without_this_stop current_stop ) 
+      
           let treshold 0 ; if the delta heuristic of the bus is >0 then the bus can respond to the request
           let message_cont (build-REQUEST-content "overcrowded_station" current_stop treshold)
           let mess_id (build-m-id bus_id)
           set message_to_send (build-message bus_id mess_id "REQUEST" message_cont)
           set last_sent_request message_to_send
           
-          show word (word (word (word "send request" "") message_to_send) " " ) ticks
+          ;show word (word (word (word "send request" "") message_to_send) " " ) ticks
           
           ;memorize that a request was sent for this station 
           ;first: clean var
@@ -208,7 +204,11 @@ to update-message-intentions [f_messages]
   
   applyInform m_inform
   
-  applyRequest m_request
+  ;Tick 0: sent a reply
+  ;Tick 1: receiver read reply and send if necessary action
+  ;Tick 2: read action if necessary 
+  if( (ticks - last_reply_time ) > 2)
+  [applyRequest m_request]
   
   applyReply m_reply f_messages
   
@@ -297,10 +297,15 @@ to applyRequest[m_request]
       if(var_name = "overcrowded_line" and (break? = false))
       [
         ;wait for every bus to be on the line 
-        if( ticks > 60) 
+        if( ticks > 60 and ((not-abandoning-station current_route var_val) = true))
         [
           ;compute the cost of reaching the new route
-          let next_index (item 1 (get-next-direction-index bus_id))
+          let next_index -1
+          let dist compute-distance-to-stop xcor ycor (item route_index current_route)
+          ;estimate at which stop the bus would be in 2 ticks 
+          ifelse ( ( dist < 2) )
+          [set next_index (item 1 (get-next-direction-index bus_id true))]
+          [set next_index route_index]
           let next_s (item next_index current_route)
           let dev_route (find-way-to-route next_s var_val)
           let dev_cos (travel-gain bus_type dev_route)
@@ -316,6 +321,7 @@ to applyRequest[m_request]
           
           if( d_heur > treshold)
           [ 
+
             ;check if we are not alredy on the new route
             if (current_stop = (first dev_route))
             [
@@ -330,7 +336,7 @@ to applyRequest[m_request]
               set new_drive_intention "deviate"
               set deviate_route dev_route
             ]
-            
+            show (word word word word dev_route " " drive_intention " " new_drive_intention)
             set new_fixed_route var_val
             set heuristics_dvalue lput d_heur heuristics_dvalue
             set corresponding_mess lput ? corresponding_mess
@@ -394,7 +400,7 @@ to applyRequest[m_request]
       
       ;send the message 
       my-send-message best_sender_id reply_message
-      show word (word (word (word "send reply" best_sender_id) reply_message) " " )ticks
+      ;show word (word (word (word "send reply" best_sender_id) reply_message) " " )ticks
       
       ;memorize the tick :
       set last_reply_time ticks
@@ -452,7 +458,7 @@ to applyReply[m_reply f_messages]
     ;Resend original message to the bus but this time as an action: notify him that he has to do the changes he did for the computation of delta heuristic
     let action_message (build-message bus_id message_id "ACTION" (build-ACTION-content var_name var_value)) 
     my-send-message best_sender_id action_message
-    show word (word "send action " best_sender_id) action_message
+    ;show word (word "send action " best_sender_id) action_message
   ]
 end
 
@@ -462,7 +468,6 @@ to applyAction[var_name var_value]
     [
       show word word word word "deviate to overcrowded station !!!!!: " (item route_index fixed_route) " " fixed_route " => "
       set drive_intention new_drive_intention
-      show word "Current drive intention " drive_intention
       ;deviate route has already been set 
       
       ;update bus_deserving_stations
@@ -474,13 +479,14 @@ to applyAction[var_name var_value]
       set route_index (position (item route_index fixed_route) new_fixed_route)
       set fixed_route new_fixed_route
       
-     show word word (item route_index new_fixed_route) " " new_fixed_route 
+     ;show word word (item route_index new_fixed_route) " " new_fixed_route 
             
       set break? true
     ]
     if(var_name = "overcrowded_line")
     [
-      show word word word word "deviate to overcrowded line !!!!!" current_stop " " deviate_route var_value
+      let dist compute-distance-to-stop xcor ycor (item route_index fixed_route)
+      show word word word word word word word word "deviate to overcrowded line !!!!!" fixed_route " " current_stop " " (item route_index fixed_route) " " deviate_route var_value
       set drive_intention new_drive_intention
       ;deviate route has already been set 
       

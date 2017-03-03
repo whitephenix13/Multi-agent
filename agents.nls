@@ -65,10 +65,7 @@ buses-own [
 ; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
 globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
 
-;Correct when deviate = the sattion where we are 
-;Correct some random bug 
-  
-
+;TODO: reply2 sent between reply1 and action1 ? because of heuristicdvalue not reset? 
 to init-buses
   ;bus comes from bus_init 
   ifelse(ticks < 3)
@@ -120,6 +117,7 @@ to init-buses
     
     set direction "GO"
     set route_index 1
+    set next_stop -1
     
     if bus_type = 1 [set bus_capacity 12]
     if bus_type = 2 [set bus_capacity 60]
@@ -132,6 +130,8 @@ to init-buses
     
     set message_receivers (list)
    
+    set add_bus_index -1
+    
   ]
   ;bus was created because another bus asked for it. In order to init, wait for him to receive an init message 
   [
@@ -142,6 +142,7 @@ to init-buses
 
     set direction "GO"
     set route_index -1
+    set next_stop -1
     
     if bus_type = 1 [set bus_capacity 12]
     if bus_type = 2 [set bus_capacity 60]
@@ -153,6 +154,7 @@ to init-buses
     set addbus_intention "init" ; flag to ask for initialization
     
     set message_receivers (list)
+    set add_bus_index -1
   ]
 
 end
@@ -318,7 +320,7 @@ to execute-actions
         let break? false
         
         ;update index and direction 
-        let next_dir_index (get-next-direction-index bus_id)
+        let next_dir_index (get-next-direction-index bus_id false)
         set direction (item 0 next_dir_index)
         set route_index (item 1 next_dir_index)
       
@@ -337,7 +339,7 @@ to execute-actions
         ]
         
         ;update index and direction 
-        let next_dir_index (get-next-direction-index bus_id)
+        let next_dir_index (get-next-direction-index bus_id false)
         set direction (item 0 next_dir_index)
         set route_index (item 1 next_dir_index)
         
