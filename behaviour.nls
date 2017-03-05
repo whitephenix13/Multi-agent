@@ -1,8 +1,9 @@
 to update_addbus_intention
   ; initialize 6 bus with different routes at the beginning
-  ifelse ticks = 2 [
+  if ticks = 2 [
     set addbus_intention "addinit"
   ]
+  if( ticks > 2 and (addbus_intention != "add" ) )
   [
     set addbus_intention "none"
   ]
@@ -230,20 +231,24 @@ to applyInform[m_inform]
   foreach m_inform
   [ 
     ;parse message and get a list where the first element is the task name, all the following one are the var values AS A STRING ; (use "read-from-string str" to get an integer/list ... of the list 
-    let list_infos (read-INFORM-content ?)
+    let content get-content ?
+    let list_infos (read-INFORM-content content)
     let task_name (item 0 list_infos)
     if task_name = "init"
     [
-      set fixed_route add_fixed_route
-      set deviate_route add_deviate_route
-      set start_delay add_start_delay
-      set direction add_direction
-      set route_index add_route_index
-      set desire add_desire
-      set drive_intention add_drive_intention
-      set comm_intention add_comm_intention
-      set addbus_intention add_addbus_intention
-      
+      ;TODO: DEBUG THIS 
+      show "received init inform"
+      set fixed_route (item 1 list_infos)
+      set deviate_route (item 2 list_infos)
+      set start_delay (item 3 list_infos)
+      set direction (item 4 list_infos)
+      set route_index (item 5 list_infos)
+      set desire (item 6 list_infos)
+      set drive_intention (item 7 list_infos)
+      set comm_intention (item 8 list_infos)
+      set addbus_intention (item 9 list_infos)
+      show drive_intention
+      show fixed_route
       if(drive_intention = "deserve")
       [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
     ] 
@@ -336,7 +341,7 @@ to applyRequest[m_request]
               set new_drive_intention "deviate"
               set deviate_route dev_route
             ]
-            show (word word word word dev_route " " drive_intention " " new_drive_intention)
+            ;show (word word word word dev_route " " drive_intention " " new_drive_intention)
             set new_fixed_route var_val
             set heuristics_dvalue lput d_heur heuristics_dvalue
             set corresponding_mess lput ? corresponding_mess
@@ -413,11 +418,15 @@ to applyReply[m_reply f_messages]
   let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
   
   let gain 0
+  ; if no one reply, check if we should ask for a new bus 
   if(length (m_reply) = 0 and drive_intention = "deserve")
   [
-    set gain gain + (heuristic bus_type fixed_route ticks bus_deserving_stations + bus_cost * 420)
+    ;Will the bus be worth it ? 
+    ;Commented because not function yet 
+    ;set gain gain + (heuristic bus_type fixed_route ticks bus_deserving_stations + bus_cost * 420) 
     if(gain > 0)
     [
+      ;set the init parameter of the bus 
       set addbus_intention "add"
       set add_size 3
       set add_fixed_route fixed_route
@@ -448,26 +457,6 @@ to applyReply[m_reply f_messages]
       set add_addbus_intention "none"
     ]
   ]
-  ;if received no reply, check if should add a bus, if that is the case, the bus will only be added at the end of the tick: send a message at next tick to this bus to initialize it
-  ;TODO: Rezka
-  ;TODO:if length m_reply =0 and drive_intention = "deserve"
-     ;TODO estimate needed bus size: estimate number of people to pick during a route loop, use mean_time_between_stop = 6.25/1 (see heuristics) * nb_stop (time for route)
-     ; then estimate the number of people expected for the next hour and multiply by expected_route_time/60 (if expected_route_time<60, toherwise consider several hours...)
-     ;TODO: estimate bus addition gain = total bus heuristic (calculate from now until the end of the run, ie ticks =1440) + bus init cost *mean_time(=420)
-     ;TODO: if addition gain > 0 
-        ;TODO: set addbus_intention "add"
-        ;TODO: set good parameter for creation:
-        ;TODO: set add_size ;1 or 2 or 3
-        ;TODO: set add_fixed_route fixed_route ; same route as mine
-        ;TODO: set add_deviate_route ; if member? 3 fixed_route (if centraal is a member of the fixed route), set this to find-way-to-route 3 fixed_route, else (list)
-        ;TODO: set add_start_delay ; if needed to add a delay. If no idea what to do, set it to 0 
-        ;TODO: set add_route_index; if centraal in fixed route: [compute "let ind position 3 fixed_route". if ind <length(fixed_route)- 1, set add_route_index (ind + 1) and set add_direction "GO"
-        ; else set add_route_index (ind - 1)  and set add_direction "RETURN" ], else set it to 0 and set add_direction to "GO"
-        ;TODO: set add_direction ; see above 
-        ;TODO: set add_desire ; mostly "deserve", can also be "connect line"
-        ;TODO: set add_drive_intention; if has to deviate (ie: add_deviate_route is not null), set to "deviate" else, set to "deserve"
-        ;TODO: set add_comm_intention; set to "none"
-        ;TODO: set add_addbus_intention; set to "none"
         
   foreach m_reply
   [
@@ -502,7 +491,7 @@ to applyAction[var_name var_value]
     let break? false
     if(var_name = "overcrowded_station")
     [
-      show word word word word "deviate to overcrowded station !!!!!: " (item route_index fixed_route) " " fixed_route " => "
+      ;show word word word word "deviate to overcrowded station !!!!!: " (item route_index fixed_route) " " fixed_route " => "
       set drive_intention new_drive_intention
       ;deviate route has already been set 
       
@@ -522,7 +511,7 @@ to applyAction[var_name var_value]
     if(var_name = "overcrowded_line")
     [
       let dist compute-distance-to-stop xcor ycor (item route_index fixed_route)
-      show word word word word word word word word "deviate to overcrowded line !!!!!" fixed_route " " current_stop " " (item route_index fixed_route) " " deviate_route var_value
+      ;show word word word word word word word word "deviate to overcrowded line !!!!!" fixed_route " " current_stop " " (item route_index fixed_route) " " deviate_route var_value
       set drive_intention new_drive_intention
       ;deviate route has already been set 
       
