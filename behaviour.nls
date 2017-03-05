@@ -412,12 +412,48 @@ end
 to applyReply[m_reply f_messages]
   let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
   
+  let gain 0
+  if(length (m_reply) = 0 and drive_intention = "deserve")
+  [
+    set gain gain + (heuristic bus_type fixed_route ticks bus_deserving_stations + bus_cost * 420)
+    if(gain > 0)
+    [
+      set addbus_intention "add"
+      set add_size 3
+      set add_fixed_route fixed_route
+      ifelse member? 3 fixed_route [set add_deviate_route find-way-to-route 3 fixed_route]
+      [set add_deviate_route (list)]
+      set add_start_delay 0
+      ifelse member? 3 fixed_route 
+      [
+        let ind position 3 fixed_route
+        ifelse(ind < length(fixed_route) - 1)
+          [
+            set add_route_index (ind + 1)
+            set add_direction "GO"
+          ]
+          [
+            set add_route_index (ind - 1)
+            set add_direction "RETURN"
+          ]
+      ]
+      [
+        set add_route_index 0
+        set add_direction "GO"
+      ]
+      set add_desire "deserve"
+      ifelse(add_deviate_route != 0)[set add_drive_intention "deviate"]
+      [set add_drive_intention "deserve"]
+      set add_comm_intention "none"
+      set add_addbus_intention "none"
+    ]
+  ]
   ;if received no reply, check if should add a bus, if that is the case, the bus will only be added at the end of the tick: send a message at next tick to this bus to initialize it
   ;TODO: Rezka
   ;TODO:if length m_reply =0 and drive_intention = "deserve"
      ;TODO estimate needed bus size: estimate number of people to pick during a route loop, use mean_time_between_stop = 6.25/1 (see heuristics) * nb_stop (time for route)
      ; then estimate the number of people expected for the next hour and multiply by expected_route_time/60 (if expected_route_time<60, toherwise consider several hours...)
-     ;TODO: estimate bus addition gain = total bus heuristic (calculate from now until the end of the run, ie ticks =1440)   bus init cost *mean_time(=420)
+     ;TODO: estimate bus addition gain = total bus heuristic (calculate from now until the end of the run, ie ticks =1440) + bus init cost *mean_time(=420)
      ;TODO: if addition gain > 0 
         ;TODO: set addbus_intention "add"
         ;TODO: set good parameter for creation:
