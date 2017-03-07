@@ -3,7 +3,7 @@
 
 to-report travel-gain[my_bus_type route]
 
-  let mean_time 420
+  let mean_travel_cost -1250000 ;-175000 
   let cost_per_patch 0
   if my_bus_type = 1 
   [set cost_per_patch 1]
@@ -14,12 +14,12 @@ to-report travel-gain[my_bus_type route]
   
   let route_length (compute-route-length route)
     
-  report (-1 * mean_time * cost_per_patch * route_length)
+  report ( cost_per_patch * route_length) / mean_travel_cost
 end 
 
 to-report passenger-gain[route day_time _bus_deserving_stations]
-  let mean_travel_cost 175000 
 
+  let mean_time 420
   let time_importance 2
   let bus_speed 1
   let stop_per_person 4.25;mean number of stop per person 
@@ -28,7 +28,7 @@ to-report passenger-gain[route day_time _bus_deserving_stations]
   let expected_people (compute-expected-people route day_time _bus_deserving_stations);
   
   let people_per_day 42776; the total number of people per day 
-  report (time_importance * mean_travel_cost * (stop_per_person * distance_stops) / bus_speed  * expected_people / people_per_day)
+  report (time_importance  * (stop_per_person * distance_stops) / bus_speed  * expected_people / people_per_day) / mean_time 
 end
 
 to-report heuristic[my_bus_type route day_time _bus_deserving_stations]

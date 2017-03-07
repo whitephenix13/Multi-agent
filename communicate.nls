@@ -222,12 +222,12 @@ to execute-set[var_name operator var_value]
 end
 to my-send-message[bus-id message]
   let action-type (get-action-type message)
-  let allow-send? ( not ( (action-type = "INFORM" or (action-type = "REQUEST") ) and (comm_intention = "disable") ))
+  let allow-send? ( not (( action-type = "REQUEST" ) and (comm_intention = "disable")) )
   ifelse (allow-send?)
   [
     send-message bus-id message
   ]
   [
-     show ("WARNING: bus trying to send an INFORM or REQUEST message but its commnication intention is disabled. Try using REPLY/ACTION instead to reply to an existing message or wait for the timeout." )
+     show ("WARNING: bus trying to send a REQUEST message but its commnication intention is disabled. Try using REPLY/ACTION instead to reply to an existing message or wait for the timeout." )
   ]
 end

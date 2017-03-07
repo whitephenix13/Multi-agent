@@ -36,6 +36,7 @@ buses-own [
   station_to_drop    ; Id of the station that a bus wants to drop. If none, set to -1
   station_to_drop_heur; Variation of heuristics obtained if the bus drops the station
   last_reply_time     ; Keep track of the tick of the last replied message. Can not drop a station if I replied during this frame pr the previous one 
+  last_request_time   ; Keep track of the tick of the last requested message. Used for the bus addition
     
   add_bus_index      ; keep track of the index of the bus we added. This is used to send him a message to initialize it; = to -1 if none
   add_size           ; The desired size of the bus we want to add 
@@ -132,6 +133,7 @@ to init-buses
     set message_receivers (list)
    
     set add_bus_index -1
+    set last_request_time -10
     
   ]
   ;bus was created because another bus asked for it. In order to init, wait for him to receive an init message 
@@ -159,6 +161,7 @@ to init-buses
     set overcrowded_line (list)
     
     set add_bus_index -1
+    set last_request_time -10
   ]
 
 end

@@ -180,6 +180,9 @@ to update_comm_intention [f_messages]
           ;then add this line to the list 
           set overcrowded_station lput (list current_stop ticks) overcrowded_station
           set break2? true
+          
+          ;memorize the tick :
+          set last_request_time ticks
         ]
       ]
       
@@ -417,8 +420,9 @@ to applyReply[m_reply f_messages]
   
   let gain 0
   ; if no one reply, check if we should ask for a new bus 
-  if(length (m_reply) = 0 and drive_intention = "deserve")
+  if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve"))
   [
+    show "should add bus? "
     ;In order to find to good size, estimate the expected number of people to pick on a full route loop
     ;Time to do your route loop: mean_time_between_stop * number_stop
     let expected_route_time 6.32 * (length(fixed_route) - 1) 
@@ -453,9 +457,9 @@ to applyReply[m_reply f_messages]
     ]
     
     ;Will the bus be worth it ? 
-    if add_size = 1 [set gain -1 * 6000 * 42]
-    if add_size = 2 [set gain -1 * 12000 * 420]
-    if add_size = 3 [set gain -1 * 20000 * 420]
+    if add_size = 1 [set gain  6000 / -1250000]
+    if add_size = 2 [set gain  12000 / -1250000]
+    if add_size = 3 [set gain  20000 / -1250000]
 
     let nb_hour_gain (ceiling( (1440 - ticks)  / 60)); remaining number of entire hour before end of run + 1 if number of minutes is non nul
     
