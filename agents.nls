@@ -162,6 +162,9 @@ to init-buses
     
     set add_bus_index -1
     set last_request_time -10
+    
+    set bus_id_list lput (bus_number + 24) bus_id_list
+    set bus_number bus_number + 1
   ]
 
 end
@@ -288,6 +291,7 @@ to execute-actions
     ;send message 
     if(comm_intention = "send")
     [
+      ;show word word word "send " message_to_send " to " message_receivers
       foreach message_receivers
       [my-send-message ? (message_to_send)]
     ]
@@ -307,11 +311,11 @@ to execute-actions
     [
       ; add more bus as time increases
       add-bus(add_size)
-      set bus_id_list lput (bus_number + 24) bus_id_list
+      ;set bus_id_list lput (bus_number + 24) bus_id_list
       
       set add_bus_index (bus_number + 24)
       
-      set bus_number bus_number + 1
+      ;set bus_number bus_number + 1
       set addbus_intention "none"
     ]
     
