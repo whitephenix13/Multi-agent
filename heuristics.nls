@@ -20,7 +20,7 @@ end
 to-report passenger-gain[route day_time _bus_deserving_stations]
 
   let mean_time 420
-  let time_importance 2
+  let time_importance 4
   let bus_speed 1
   let stop_per_person 4.25;mean number of stop per person 
   let distance_stops 6.32; mean distance between two stops
