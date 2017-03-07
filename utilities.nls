@@ -233,3 +233,11 @@ to-report compute-distance-to-stop[bus_x bus_y next_stop_id]
   set res sqrt (((nsx - bus_x) ^ 2) + ((nsy - bus_y) ^ 2))
   report res
 end
+
+to-report set-gain[bus_add_size]
+  let gain 0
+  if bus_add_size = 1 [set gain  6000 / -1250000]
+  if bus_add_size = 2 [set gain  12000 / -1250000]
+  if bus_add_size = 3 [set gain  20000 / -1250000]
+  report gain
+end

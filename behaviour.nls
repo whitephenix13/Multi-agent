@@ -451,13 +451,10 @@ to applyReply[m_reply f_messages]
       set add_size 2
       set break? true
     ]
-   
-    ;Will the bus be worth it ? 
-    if add_size = 1 [set gain  6000 / -1250000]
-    if add_size = 2 [set gain  12000 / -1250000]
-    if add_size = 3 [set gain  20000 / -1250000]
 
     let nb_hour_gain (ceiling( (1440 - ticks)  / 60)); remaining number of entire hour before end of run + 1 if number of minutes is non nul
+    
+    set gain set-gain add_size
     
     let init_add_size add_size
     let break2? false
@@ -473,8 +470,11 @@ to applyReply[m_reply f_messages]
         ;if(ticks > 360) 
         ;[show word "          " (h_gain)]
       ]
-      if(gain > 0) [set break2? true]
-      set init_add_size (init_add_size - 1)
+      ifelse(gain > 0) [set break2? true]
+      [
+        set init_add_size (init_add_size - 1)
+        set gain set-gain init_add_size
+      ]
       if(init_add_size = 0) [set break2? true]
     ]
     if(init_add_size != 0)
