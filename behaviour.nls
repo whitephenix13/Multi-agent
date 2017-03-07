@@ -278,8 +278,8 @@ to applyInform[m_inform]
 end
 
 to applyRequest[m_request]
-  let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
-  let corresponding_mess (list) ; corresponding message to the heuristic_dvalue 
+  let heuristics_dvalue -1 ; store the gain/loss in heuristic by the change
+  let corresponding_mess -1 ; corresponding message to the heuristic_dvalue 
   
   let current_route -1
   if(drive_intention = "deserve" )
@@ -325,9 +325,9 @@ to applyRequest[m_request]
           ;compute the difference between heuristic
           let d_heur ( (new_heur + dev_cos) - (cur_heur) )
           
-          if( d_heur > treshold)
+          if( d_heur > treshold and (d_heur > heuristics_dvalue) )
           [ 
-
+            ;show word "reply to overcrowded line: " ticks
             ;check if we are not alredy on the new route
             if (current_stop = (first dev_route))
             [
@@ -344,9 +344,8 @@ to applyRequest[m_request]
             ]
             ;show (word word word word dev_route " " drive_intention " " new_drive_intention)
             set new_fixed_route var_val
-            set heuristics_dvalue lput d_heur heuristics_dvalue
-            set corresponding_mess lput ? corresponding_mess
-        
+            set heuristics_dvalue d_heur 
+            set corresponding_mess ? 
           ]
           
           ;memorize that a request was sent for this line 
@@ -362,6 +361,7 @@ to applyRequest[m_request]
         ;wait for every bus to be on the line 
         if( ticks > 60) 
         [
+          ;show word "reply to overcrowded station: " ticks
           ;compute route induced by the addition of the overcrowded station to current_route
           let new_route (best-route var_val current_route)
           ;compute new and previous gain
@@ -369,13 +369,13 @@ to applyRequest[m_request]
           let new_heur  (heuristic bus_type new_route ticks new_bus_deserv)
           let cur_heur (heuristic bus_type current_route ticks bus_deserving_stations) 
           let d_heur (new_heur - cur_heur)
-          if( d_heur > treshold)
+          if( d_heur > treshold and (d_heur > heuristics_dvalue))
           [
             set new_drive_intention "deserve"
             set deviate_route []
             set new_fixed_route new_route
-            set heuristics_dvalue lput d_heur heuristics_dvalue
-            set corresponding_mess lput ? corresponding_mess
+            set heuristics_dvalue d_heur 
+            set corresponding_mess ? 
           ]
           
           ;memorize that a request was sent for this station 
@@ -392,20 +392,16 @@ to applyRequest[m_request]
         show( word (word "WARNING: the following variable name: " var_name) " was not handled in applyRequest")
       ]
     ]
-    if(length(heuristics_dvalue) > 0)
+    if(heuristics_dvalue != -1)
     [
-      ;find best request to answer to 
-      let best_dvalue max heuristics_dvalue
-      let best_dvalue_index position best_dvalue heuristics_dvalue
-      
+     
       ;Send message to bus
-      let best_m (item best_dvalue_index corresponding_mess)
-      let message_id (get-m-id best_m)
-      let best_sender_id  (get-sender best_m)
-      let reply_message (build-message bus_id message_id "REPLY" (build-REPLY-content best_dvalue))
+      let message_id (get-m-id corresponding_mess)
+      let sender_id  (get-sender corresponding_mess)
+      let reply_message (build-message bus_id message_id "REPLY" (build-REPLY-content heuristics_dvalue))
       
       ;send the message 
-      my-send-message best_sender_id reply_message
+      my-send-message sender_id reply_message
       ;show word (word (word (word "send reply" best_sender_id) reply_message) " " )ticks
       
       ;memorize the tick :
@@ -422,7 +418,6 @@ to applyReply[m_reply f_messages]
   ; if no one reply, check if we should ask for a new bus 
   if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve"))
   [
-    show "should add bus? "
     ;In order to find to good size, estimate the expected number of people to pick on a full route loop
     ;Time to do your route loop: mean_time_between_stop * number_stop
     let expected_route_time 6.32 * (length(fixed_route) - 1) 
@@ -545,7 +540,7 @@ to applyAction[var_name var_value]
     let break? false
     if(var_name = "overcrowded_station")
     [
-      ;show word word word word "deviate to overcrowded station !!!!!: " (item route_index fixed_route) " " fixed_route " => "
+      ;show word word word word word "deviate to overcrowded station !!!!!: " (item route_index fixed_route) " " fixed_route " : " ticks
       set drive_intention new_drive_intention
       ;deviate route has already been set 
       
@@ -565,7 +560,7 @@ to applyAction[var_name var_value]
     if(var_name = "overcrowded_line")
     [
       let dist compute-distance-to-stop xcor ycor (item route_index fixed_route)
-      ;show word word word word word word word word "deviate to overcrowded line !!!!!" fixed_route " " current_stop " " (item route_index fixed_route) " " deviate_route var_value
+      ;show word word word word word word word word word word "deviate to overcrowded line !!!!!" fixed_route " " current_stop " " (item route_index fixed_route) " " deviate_route var_value ": " ticks
       set drive_intention new_drive_intention
       ;deviate route has already been set 
       
