@@ -422,7 +422,6 @@ to applyReply[m_reply f_messages]
   ; if no one reply, check if we should ask for a new bus 
   if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve"))
   [
-    show "should add bus? "
     ;In order to find to good size, estimate the expected number of people to pick on a full route loop
     ;Time to do your route loop: mean_time_between_stop * number_stop
     let expected_route_time 6.32 * (length(fixed_route) - 1) 
@@ -455,7 +454,7 @@ to applyReply[m_reply f_messages]
       set add_size 2
       set break? true
     ]
-    
+   
     ;Will the bus be worth it ? 
     if add_size = 1 [set gain  6000 / -1250000]
     if add_size = 2 [set gain  12000 / -1250000]
@@ -463,15 +462,27 @@ to applyReply[m_reply f_messages]
 
     let nb_hour_gain (ceiling( (1440 - ticks)  / 60)); remaining number of entire hour before end of run + 1 if number of minutes is non nul
     
-    set i 0 
-    while [i < nb_hour_gain]
+    let init_add_size add_size
+    let break2? false
+     
+    while [init_add_size > 0 and break2? = false]
     [
-       let h_gain (heuristic bus_type fixed_route (ticks + i * 60) bus_deserving_stations)
-       set gain (gain + h_gain)
-       set i (i + 1)
-       ;if(ticks > 360) 
-       ;[show word "          " (h_gain)]
+      set i 0
+      while [i < nb_hour_gain]
+      [
+        let h_gain (heuristic init_add_size fixed_route (ticks + i * 60) bus_deserving_stations)
+        set gain (gain + h_gain)
+        set i (i + 1)
+        ;if(ticks > 360) 
+        ;[show word "          " (h_gain)]
+      ]
+      if(gain > 0) [set break2? true]
+      set init_add_size (init_add_size - 1)
+      if(init_add_size = 0) [set break2? true]
     ]
+    if(init_add_size != 0)
+    [set add_size init_add_size]
+    
    ; show word word add_size " " gain
     if(gain > 0 and (bus_number < 100))
     [
