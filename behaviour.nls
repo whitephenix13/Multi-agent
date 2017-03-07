@@ -96,6 +96,7 @@ to update_comm_intention [f_messages]
     let message_id (build-m-id bus_id)
     let message (build-message bus_id message_id "INFORM" content)
     my-send-message add_bus_index message
+    set add_bus_index  -1
   ]
   if( comm_intention = "none" and (not break?))
   [
@@ -236,19 +237,16 @@ to applyInform[m_inform]
     let task_name (item 0 list_infos)
     if task_name = "init"
     [
-      ;TODO: DEBUG THIS 
-      show "received init inform"
-      set fixed_route (item 1 list_infos)
-      set deviate_route (item 2 list_infos)
-      set start_delay (item 3 list_infos)
+      show "received init inform " 
+      set fixed_route read-from-string(item 1 list_infos)
+      set deviate_route read-from-string(item 2 list_infos)
+      set start_delay read-from-string(item 3 list_infos)
       set direction (item 4 list_infos)
-      set route_index (item 5 list_infos)
+      set route_index read-from-string(item 5 list_infos)
       set desire (item 6 list_infos)
       set drive_intention (item 7 list_infos)
       set comm_intention (item 8 list_infos)
       set addbus_intention (item 9 list_infos)
-      show drive_intention
-      show fixed_route
       if(drive_intention = "deserve")
       [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
     ] 
@@ -422,16 +420,22 @@ to applyReply[m_reply f_messages]
   if(length (m_reply) = 0 and drive_intention = "deserve")
   [
     ;Will the bus be worth it ? 
-    ;Commented because not function yet 
-    ;set gain gain + (heuristic bus_type fixed_route ticks bus_deserving_stations + bus_cost * 420) 
-    if(gain > 0)
+    ;TODO: correct gain since it is always negatif... correct heuristic ?
+    set gain (gain + (heuristic bus_type fixed_route ticks bus_deserving_stations) + bus_cost * 420 )
+    if(gain > 0 and (bus_number < 100))
     [
       ;set the init parameter of the bus 
       set addbus_intention "add"
       set add_size 3
       set add_fixed_route fixed_route
-      ifelse member? 3 fixed_route [set add_deviate_route find-way-to-route 3 fixed_route]
+      ifelse member? 3 fixed_route 
+      [set add_deviate_route find-way-to-route 3 fixed_route]
       [set add_deviate_route (list)]
+      ;check if we are not already on the new route knowing that we start at stop 3
+      if (3 = (first add_deviate_route))
+      [
+        set add_deviate_route (remove-item 0 add_deviate_route)
+      ]
       set add_start_delay 0
       ifelse member? 3 fixed_route 
       [
@@ -451,7 +455,7 @@ to applyReply[m_reply f_messages]
         set add_direction "GO"
       ]
       set add_desire "deserve"
-      ifelse(add_deviate_route != 0)[set add_drive_intention "deviate"]
+      ifelse(length(add_deviate_route) > 0)[set add_drive_intention "deviate"]
       [set add_drive_intention "deserve"]
       set add_comm_intention "none"
       set add_addbus_intention "none"

@@ -155,6 +155,9 @@ to init-buses
     set addbus_intention "init" ; flag to ask for initialization
     
     set message_receivers (list)
+    set overcrowded_station (list)
+    set overcrowded_line (list)
+    
     set add_bus_index -1
   ]
 
