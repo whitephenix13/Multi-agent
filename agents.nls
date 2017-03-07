@@ -120,10 +120,10 @@ to init-buses
     set route_index 1
     set next_stop -1
     
-    if bus_type = 1 [set bus_capacity 12]
-    if bus_type = 2 [set bus_capacity 60]
-    if bus_type = 3 [set bus_capacity 150]
-    
+   if bus_type = 1 [set bus_capacity 12 set bus_cost 6000]
+   if bus_type = 2 [set bus_capacity 60 set bus_cost 12000]
+   if bus_type = 3 [set bus_capacity 150 set bus_cost 20000]  
+   
     set desire "deserve" 
     set drive_intention "deserve" 
     set comm_intention "none"
