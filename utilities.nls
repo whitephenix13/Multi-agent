@@ -21,6 +21,64 @@ to-report equal-route-stops[route1 route2]
   ]
   report true
 end
+to-report bus-on-superline[bus_route _bus_deserving_station]
+  let same_route_bus (list)
+  let first_loop? true
+  foreach bus_route
+  [
+    ;memorize buses that so far have the same route 
+    let temp (list)
+    ; get bus id list at this stop
+    let bus_deserving_station_ids (item ? _bus_deserving_station)
+    foreach(bus_deserving_station_ids)
+    [
+        ifelse(first_loop? = true)
+        [
+          set temp lput ? temp
+        ]
+        [
+          ;the bus needed to be to the previous list to ensure the fact that ALL the stops are the same 
+          if(member? ? same_route_bus)
+          [set temp lput ? temp]
+        ]
+        ;actualize the same_route_bus 
+        set same_route_bus temp
+    ]
+    set first_loop? false
+  ]
+  
+  report same_route_bus
+end
+
+;report the list of buses where all their deserved station is in my route
+to-report bus-on-subline[route _bus_deserving_station]
+  let res (list)
+  let diff_bus_route (list) ; buses with a route that contains at least one station that is not in route 
+  let all_stops [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23]
+  foreach all_stops
+  [
+    ;find buses that have a stop that is not in route 
+    if(not (member? ? route))
+    [
+      ;find all buses deserving station ? 
+      let bus_deserving_station_ids (item ? _bus_deserving_station)
+      foreach(bus_deserving_station_ids)
+      [
+        ;add the bus to the list of not already done
+        if(not (member? ? diff_bus_route))
+        [set diff_bus_route lput ? diff_bus_route]
+      ]
+    ]
+  ]
+  ; find the opposite of diff_bus_route
+  foreach bus_id_list
+  [
+    if(not (member? ? diff_bus_route))
+    [set res lput ? res]
+  ]
+
+  report res
+end
 
 to-report compute-route-length [route]
   let leng 0 
@@ -46,7 +104,7 @@ to-report get-next-direction-index[b_id get_next_next]
     
     ifelse(next_stop = -1 or (next_stop = false) or (get_next_next = true))
     [
-      if(drive_intention = "deserve")
+      if(drive_intention = "deserve" or (drive_intention = "maintain"))
       [
         let break? false
         ;update index 
@@ -174,34 +232,9 @@ to-report my-get-distance[bs1 bs2]
   [report get-distance bs1 bs2]
 end
 
-to-report get_buses_with_different_route[bus_route]
+to-report get_buses_with_different_route[bus_route _bus_deserving_station]
   let res bus_id_list
-  ;buses that have the same route as the bus_id 
-  let same_route_bus (list)
-  let first_loop? true
-  foreach bus_route
-  [
-    ;memorize buses that so far have the same route 
-    let temp (list)
-    ; get bus id list at this stop
-    let bus_deserving_station_ids (item ? bus_deserving_stations)
-    foreach(bus_deserving_station_ids)
-    [
-        ifelse(first_loop? = true)
-        [
-          set temp lput ? temp
-        ]
-        [
-          ;the bus needed to be to the previous list to ensure the fact that ALL the stops are the same 
-          if(member? ? same_route_bus)
-          [set temp lput ? temp]
-        ]
-        ;actualize the same_route_bus 
-        set same_route_bus temp
-    ]
-    set first_loop? false
-  ]
-  
+  let same_route_bus (bus-on-superline bus_route _bus_deserving_station)
   ;remove buses that have the same route 
   foreach same_route_bus
   [

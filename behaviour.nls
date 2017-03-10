@@ -96,16 +96,15 @@ to update_comm_intention [f_messages]
     let message_id (build-m-id bus_id)
     let message (build-message bus_id message_id "INFORM" content)
     my-send-message add_bus_index message
-    show word "send init message to " add_bus_index
     set add_bus_index  -1
   ]
   if( comm_intention = "none" and (not break?))
   [
     let current_route -1
-    if(drive_intention = "deserve" )
+    if(drive_intention = "deserve" or (drive_intention = "maintain"))
     [set current_route fixed_route]
     ;we do not check for optimization if we are deviating 
-    if(drive_intention = "deviate" )
+    if(drive_intention = "deviate" or (drive_intention = "wait"))
     [set current_route -1]
     
     if current_route != -1
@@ -126,14 +125,31 @@ to update_comm_intention [f_messages]
           set delay_fine?  (line_delay_ok overcrowded_line overcrowded_line? ticks)
         ]
         
+       if(drive_intention = "maintain")
+        [
+          ;find all buses on subroute 
+          let bus_on_subline (bus-on-subline current_route bus_deserving_stations)
+          let mess_content ( build-inform-content "unwait_deserve" (list "deserve") )
+          let mess_id (build-m-id bus_id)
+          let mess (build-message bus_id mess_id "INFORM" mess_content)
+          foreach bus_on_subline
+          [
+            my-send-message ? mess
+
+          ] 
+          ;change own intention to deserve
+          set drive_intention "deserve"
+          set break2? true
+        ]
+        
         if(delay_fine? = true and (not break2?))
         [     
           set message_receivers (list)
           set message_to_send "" 
           
           ;Send message to every bus does not already have all of my stop in his line
-          set message_receivers (get_buses_with_different_route current_route)
-   
+          set message_receivers (get_buses_with_different_route current_route bus_deserving_stations)
+          
           let treshold 0 ; if the delta heuristic of the bus is >0 then the bus can respond to the request
           let message_cont (build-REQUEST-content "overcrowded_line" current_route treshold)
           let mess_id (build-m-id bus_id)
@@ -147,6 +163,7 @@ to update_comm_intention [f_messages]
           set overcrowded_line (clean_delay_var overcrowded_line ticks)
           ;then add this line to the list 
           set overcrowded_line lput (list current_route ticks) overcrowded_line
+        
           set break2? true
         ]
       ]
@@ -186,7 +203,22 @@ to update_comm_intention [f_messages]
           set last_request_time ticks
         ]
       ]
-      
+
+      ;check for uncrowded line
+      let uncrowded_line? (check-uncrowded-line current_route)
+      ;ask the other bus if can stop
+      if(uncrowded_line? != false and (drive_intention = "deserve" or (drive_intention = "maintain") ) and (not break2?) )
+      [
+        set message_receivers (bus-on-superline current_route bus_deserving_stations)
+        let message_cont (build-REQUEST-content "wait_deserve" 0 0);need no value and no threshold
+        let mess_id (build-m-id bus_id)
+        set message_to_send (build-message bus_id mess_id "REQUEST" message_cont)
+        set last_sent_request message_to_send
+        
+        set break2? true
+        set last_request_time ticks
+      ]
+
       
       ;if we entered in one of the previous if, change behaviour to send and set disable_ticks
       if( break2? = true) 
@@ -222,7 +254,7 @@ to update-message-intentions [f_messages]
   foreach m_action
   [
     let content get-content ?
-    let info (read-ACTION-content content)
+    let info (read-ACTION-content content false)
     applyAction (item 0 info) (item 1 info)
   ]
   
@@ -254,6 +286,11 @@ to applyInform[m_inform]
       if(drive_intention = "deserve")
       [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
     ] 
+    if task_name = "unwait_deserve"
+    [
+      ;set intention to deserve
+      set drive_intention (item 1 list_infos)
+    ]
       ;TODO: check if task_name is nameOfTheTaskForDrop 
           ;TODO: check if station_id of the message is the same as station_to_drop
               ;TODO add bus id to list of bus_id_drop 
@@ -281,12 +318,13 @@ end
 to applyRequest[m_request]
   let heuristics_dvalue -1 ; store the gain/loss in heuristic by the change
   let corresponding_mess -1 ; corresponding message to the heuristic_dvalue 
+  let corresponding_task_name  ""
   
   let current_route -1
-  if(drive_intention = "deserve" )
+  if(drive_intention = "deserve" or (drive_intention = "maintain"))
   [set current_route fixed_route]
 
-  if(drive_intention = "deviate" )
+  if(drive_intention = "deviate" or (drive_intention = "wait"))
   [set current_route -1]
     
   if current_route != -1  
@@ -347,8 +385,8 @@ to applyRequest[m_request]
             set new_fixed_route var_val
             set heuristics_dvalue d_heur 
             set corresponding_mess ? 
+            set corresponding_task_name var_name
           ]
-          
           ;memorize that a request was sent for this line 
           ;first: clean var
           set overcrowded_line (clean_delay_var overcrowded_line ticks)
@@ -377,6 +415,7 @@ to applyRequest[m_request]
             set new_fixed_route new_route
             set heuristics_dvalue d_heur 
             set corresponding_mess ? 
+            set corresponding_task_name var_name
           ]
           
           ;memorize that a request was sent for this station 
@@ -387,19 +426,44 @@ to applyRequest[m_request]
         ]
         set break? true
       ]
+      if(var_name = "wait_deserve" and (break? = false))
+      [
+        if(ticks > 2)
+        [
+          let allow_stop false
+          if(drive_intention != "wait") ; and not sent request not a long ago
+          [
+            set allow_stop true
+          ]
+          ;optimization: only reply if positive reply
+          if(allow_stop)
+          [
+            let mess_content (build-reply-content var_name allow_stop)
+            let mess (build-message bus_id (get-m-id ?) "REPLY" mess_content)
+            my-send-message (get-sender ?) mess
+            ;memorize the tick :
+            set last_reply_time ticks
+          ]
+          
+        ]
+        set break? true
+      ]
+      
       
       if(break? = false)
       [
         show( word (word "WARNING: the following variable name: " var_name) " was not handled in applyRequest")
       ]
     ]
+    
+
     if(heuristics_dvalue != -1)
     [
      
       ;Send message to bus
       let message_id (get-m-id corresponding_mess)
       let sender_id  (get-sender corresponding_mess)
-      let reply_message (build-message bus_id message_id "REPLY" (build-REPLY-content heuristics_dvalue))
+      let reply_message (build-message bus_id message_id "REPLY" (build-REPLY-content corresponding_task_name heuristics_dvalue))
       
       ;send the message 
       my-send-message sender_id reply_message
@@ -413,11 +477,15 @@ end
 
 
 to applyReply[m_reply f_messages]
-  let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
   
   let gain 0
   ; if no one reply, check if we should ask for a new bus 
-  if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve"))
+  let expect_task_name "" 
+  if( last_sent_request != "")
+  [
+    set expect_task_name(item 0 read-REPLY-content(get-content last_sent_request))
+  ]
+  if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve") and (expect_task_name != "wait_deserve" and (expect_task_name != "") ) )
   [
     ;In order to find to good size, estimate the expected number of people to pick on a full route loop
     ;Time to do your route loop: mean_time_between_stop * number_stop
@@ -519,12 +587,36 @@ to applyReply[m_reply f_messages]
       set add_addbus_intention "none"
     ]
   ]
-        
+  let heuristics_dvalue (list) ; store the gain/loss in heuristic by the change
+  let can_wait  false
+  let bus_maintain_message ""
   foreach m_reply
   [
+    let break3? false 
     let content get-content ?
-    let dvalue ( read-REPLY-content content )
-    set heuristics_dvalue lput dvalue heuristics_dvalue
+    let l_content ( read-REPLY-content content )
+    let task_name (item 0 l_content)
+    let dvalue (item 1 l_content)
+    if( (task_name = "overcrowded_line" or (task_name = "overcrowded_station")) and (break3? = false) )
+    [
+      set heuristics_dvalue lput dvalue heuristics_dvalue
+      set break3? true
+    ]
+    if(task_name = "wait_deserve")
+    [
+      if(dvalue = true)
+      [
+        set can_wait true
+        set bus_maintain_message ?
+      ]
+      set break3? true
+    ]
+    
+    if (break3? = false)
+    [
+      show word word "WARNING reply of name " task_name " has not been handled in apply reply"
+    ]
+    
   ]
   if( (length heuristics_dvalue) > 0 )
   [
@@ -546,6 +638,16 @@ to applyReply[m_reply f_messages]
     let action_message (build-message bus_id message_id "ACTION" (build-ACTION-content var_name var_value)) 
     my-send-message best_sender_id action_message
     ;show word (word "send action " best_sender_id) action_message
+  ]
+  if(can_wait = true)
+  [
+    set drive_intention "wait"
+    ;send an action to one of the sender to ask to switch from "deserve" to "maintain"
+    let mess_content (build-action-content "wait_deserve" "maintain") 
+    let sender (get-sender bus_maintain_message)
+    let m_id (get-m-id bus_maintain_message)
+    let mess (build-message bus_id m_id "ACTION" mess_content)
+    my-send-message sender mess 
   ]
 end
 
@@ -591,6 +693,11 @@ to applyAction[var_name var_value]
       ]
 
       set break? true
+    ]
+    if(var_name = "wait_deserve")
+    [
+      set drive_intention var_value
+      set break? true  
     ]
     if(break? = false)
     [

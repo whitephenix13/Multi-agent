@@ -23,7 +23,7 @@ buses-own [
   ;Behavioural variables 
   desire          ; Can be "deserve" (deserve its line) "maintain" (assure that rarely used station are deserved) "connect" (assure connections between several lines)
   addbus_intention; Can be "addinit"(add buses at the beginning) "add" (add bus during runtime) "none" 
-  drive_intention ; Can be "wait"(do not move) "deserve"(deserve its own line) "pick_extra"(pick passenger from another line) "drop_extra" (drop passenger to another line) "deviate"
+  drive_intention ; Can be "wait"(do not move) "deserve"(deserve its own line) "maintain" (deserve a line but remember that some bus are in wait intention in it) "deviate"
   comm_intention  ; Can be "send"(send a message) "disable" (can't send message REQUEST or INFORM) "none" (do nothing)
   message_content         ; Set this variable in behaviour.nls when the bus wants to send a message. This will be the message sent.
   disable_tick    ; tick value when the bus send a message for a discussion he initiated. Prevents spamming 
@@ -67,8 +67,23 @@ buses-own [
 ; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
 globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
 
-;TODO: reply2 sent between reply1 and action1 ? because of heuristicdvalue not reset? 
-to init-buses
+;TODO FIRST: rewrite read reaply since the task name has been added and check that it is used correctly everywhere 
+;TODO_WAIT :
+    ;dd = duty done , cc = code commented , ww = write work
+    ;TODO: dd set current_route to -1 if "wait"/..."maintain"
+    ;TODO: dd heristics.nls Complete check-undercrowded-line
+    ;TODO: dd utilities.nls Write a bus-on-superline to find buses that share the same station as me also check for equal-route-stops
+    ;TODO: dd utilities.nls Write a bus-on-subline to find buses that share at least one stop with my line also check for equal-route-stops
+    ;TODO: ww behaviour.nls Complete update_comm_intention to send a request message for the vote to the buses deserving any longer lines than mine.
+    ;TODO: dd behaviour.nls Complete update_comm_intention add the "maintain" intention: if overcrowded line, send message to any bus in subline and unstop them, switch to deserve
+    ;TODO: ddw behaviour.nls Complete apply request to reply YES/NO to the wait request 
+    ;TODO: dd behaviour.nls Complete apply reply : if one yes go to "wait" intention and send an action to the YES bus (which one?) to set his intention to "maintain"
+    ;TODO: dd behaviour.nls Complete apply action: if "wait" then change intention to maintain
+    ;TODO: dd behaviour.nls Complete apply inform: if received an unwait message, set intention to deserve 
+    ;TODO: dd agent.nls Complete execute-action, add the "wait" intention and the "maintain"
+
+;TODO: change ticks<60 in behaviour overcrowded line 
+ to init-buses
   ;bus comes from bus_init 
   ifelse(ticks < 3)
   [
@@ -135,6 +150,7 @@ to init-buses
     set add_bus_index -1
     set last_request_time -10
     
+    set last_sent_request ""
   ]
   ;bus was created because another bus asked for it. In order to init, wait for him to receive an init message 
   [
@@ -165,6 +181,8 @@ to init-buses
     
     set bus_id_list lput (bus_number + 24) bus_id_list
     set bus_number bus_number + 1
+    
+    set last_sent_request ""
   ]
 
 end
@@ -319,8 +337,11 @@ to execute-actions
       set addbus_intention "none"
     ]
     
-    
-    if(drive_intention = "deserve")
+    if(drive_intention = "wait" or (drive_intention = "none") )
+    [
+      ;do nothing
+    ]
+    if(drive_intention = "deserve" or (drive_intention = "maintain") )
     [   
       ; check whether a bus is in a bus stop
       if (current_stop = (item route_index fixed_route) ) [

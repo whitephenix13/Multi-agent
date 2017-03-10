@@ -57,28 +57,57 @@ to-report check-overcrowded-station [bus_stop]
   report res
 end
 
+to-report is-uncrowded [station current_ticks]
+    let tol 20 ; TODO: manually tune this 
+    ;get expected number of people per bus for the next hour 
+    let expected-people (compute-expected-people (list station) current_ticks bus_deserving_stations)
+    ;if expected number of people is under tolerance and length(bus_deserving_stations) > 1 ;ie: I'm not the only bus 
+    ;add station_id and expected people to the list 
+    if (expected-people < tol) and (length(item station bus_deserving_stations) > 1) and (station != 3)
+    [
+      report (list true expected-people)
+    ]
+    report (list false -1)
+end
+
 to-report check-uncrowded-station [route current_ticks]
-  ;TODO: Alex LELL
-  let tol 30 ; TODO: manually tune this 
+  ;Reports a station to remove or -1 of NONE :WARNING: NEVER REMOVE CENTRAAL STATION (index=3) FIND ANOTHER STATION IF THE MIN IS CENTRAAL
   let l_id (list)
   let l_value (list)
   let res -1
-  ;TODO: if hourly_passenger_location = 0 (only nonzero if heuristic was called first)
-  ;       report (list)
-  ;TODO: foreach station in route
-         ;TODO: get expected number of people per bus for the next hour using "compute-expected-people[route current_ticks bus_deserving_stations]"
-         ;TODO: if expected number of people is under tolerance and length(bus_deserving_stations) > 1 ;ie: I'm not the only bus 
-               ;TODO add station_id and expected people to the list : "set l_id lput station_id  l_id" and "set l_value lput expected_people_to_add  l_value"
-  ;TODO: find min value of l_value: "let min_val min l"
-  ;TODO: find min index value of l_value: "let index position min_val l_value"  
-  ;TODO: find corresponding station_id and "set res station_id"
-  ;TODO Reports a station to remove or -1 of NONE :WARNING: NEVER REMOVE CENTRAAL STATION (index=3) FIND ANOTHER STATION IF THE MIN IS CENTRAAL
+  let hour ((floor (ticks / 60) ) mod 24)
+  
+  if ((hourly_passenger_location = 0) or (length(route) < 3))
+  [
+    report (list)
+  ]
+  
+  foreach route
+  [
+    let uncrowded_res (is-uncrowded ? current_ticks)
+    if (item 0 uncrowded_res)
+    [
+      set l_id lput ? l_id
+      set l_value lput (item 1 uncrowded_res) l_value
+    ]
+  ]
+  ;find min value of l_value
+  ;find min index value of l_value:
+  ;find corresponding station_id 
+  if(length(l_value) > 0)
+  [
+    let min_val min l_value
+    let min_idx position min_val l_value
+    set res (item min_idx l_id)
+  ]
+
   report res
 end
 
 
 to-report check-overcrowded-line [bus_route]
-  let max_overcrowded_stop 3
+  let percentage ( 50 / 100)
+  let max_overcrowded_stop floor(length(bus_route) * percentage)
   let res 0
   let counter 0
   foreach bus_route [
@@ -95,6 +124,27 @@ to-report check-overcrowded-line [bus_route]
   ]
   report res
 end
+
+to-report check-uncrowded-line [bus_route]
+  let percentage ( 75 / 100)
+  let max_uncrowded_stop floor(length(bus_route) * percentage)
+  let res 0
+  let counter 0
+  foreach bus_route [
+    if( item 0 (is-uncrowded ? ticks))
+    [
+      set counter (counter + 1)
+    ]
+  ]
+  ifelse(counter >= max_uncrowded_stop) [
+    set res bus_route
+  ] 
+  [
+    set res false
+  ]
+  report res
+end
+
 
 to-report not-abandoning-station[_cur_route _n_route]
   foreach _cur_route

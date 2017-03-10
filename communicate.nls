@@ -160,14 +160,14 @@ to-report build-INFORM-content[task_name list_var_value]
   ]
   report res
 end
-to-report build-REQUEST-content[var_name var_value treshold]
-  report word (word (word (word var_name ";") var_value) ";") treshold
+to-report build-REQUEST-content[task_name var_value treshold]
+  report word (word (word (word task_name ";") var_value) ";") treshold
 end
-to-report build-REPLY-content[value]
-  report word value ""
+to-report build-REPLY-content[task_name value]
+  report word word task_name ";" value 
 end
-to-report build-ACTION-content[var_name var_value]
-  report word (word var_name ";") var_value
+to-report build-ACTION-content[task_name var_value]
+  report word (word task_name ";") var_value
 end
 to-report read-INFORM-content[mess]
   let m (split mess ";" )
@@ -187,13 +187,18 @@ to-report read-REQUEST-content[mess]
 end
 
 to-report read-REPLY-content[mess]
-  report (read-from-string mess)
+  let m (split mess ";")
+  let var_name (item 0 m)
+  let value read-from-string (item 1 m)
+  report (list var_name value)
 end
 
-to-report read-ACTION-content[mess]
+to-report read-ACTION-content[mess interpret?]
   let m (split mess ";" )
   let var_name (item 0 m)
-  let var_value (read-from-string (item 1 m))
+  let var_value  (item 1 m)
+  if (interpret? = true)
+  [set var_value (read-from-string var_value) ]
   report (list var_name var_value)
 end
 ;execute the following instruction : set interpreted(var_name) var_value
