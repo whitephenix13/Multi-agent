@@ -140,12 +140,24 @@ to-report total-distance[route]
 end
 
 to-report best-drop-station[route station_drop]
+  ;if drop is the first station on the route, report a list without this station
+  if position station_drop route = 0
+  [
+    report butfirst route
+  ]
+  ;if drop is the last station on the route, report a list without this station
+  if (position station_drop route) = (length(route) - 1)
+  [
+    report butlast route
+  ]
   ;split the route into two lists such that if route=[a b c d e f] and station_drop = [b], l1=[a] and l2=[c d e f]
+  let l1 sublist route 0 (position station_drop route)
+  let l2 sublist route ((position station_drop route) + 1) length(route)
   ;find l3= shortest-route2 between the last station of l1 (here a) and the first station of l2 (here c) 
+  let l3 shortest-route2 last l1 first l2
   ;merge create the list [l1 l3 l2] 
-  ;TODO Alex.LELL
-  ;TODO: I think you create the list with a big for loop and addind station with lput to a new list.
-  
+  let new_route (sentence ( butlast l1) l3 (butfirst l2)  )
   ;report the new route as a list of station id
+  report new_route
 end 
 

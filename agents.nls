@@ -65,7 +65,7 @@ buses-own [
 ; hourly_passenger_location: memorize in a list of list the estimated number of passenger at a stop given the time (in hour)
 ; init_num_bus_per_line: for convienience and parameter optimization. this number is fixed 
 ; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
-globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
+globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
 
 ;TODO FIRST: rewrite read reaply since the task name has been added and check that it is used correctly everywhere 
 ;TODO_WAIT :
@@ -148,9 +148,11 @@ globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_lo
     set message_receivers (list)
    
     set add_bus_index -1
+    set station_to_drop -1
     set last_request_time -10
     
     set last_sent_request ""
+
   ]
   ;bus was created because another bus asked for it. In order to init, wait for him to receive an init message 
   [
@@ -177,12 +179,12 @@ globals [graph bus_number bus_id_list bus_deserving_stations hourly_passenger_lo
     set overcrowded_line (list)
     
     set add_bus_index -1
+    set station_to_drop -1
     set last_request_time -10
-    
-    set bus_id_list lput (bus_number + 24) bus_id_list
-    set bus_number bus_number + 1
-    
+     
     set last_sent_request ""
+    set bus_id_list lput (bus_real_number + 24) bus_id_list
+    set bus_real_number (bus_real_number + 1)
   ]
 
 end
@@ -285,7 +287,6 @@ to pick-passenger[current_route]
 end
 
 to execute-actions 
-  
   ifelse(start_delay > 0)
   [
     set start_delay (start_delay - 1 )
@@ -300,10 +301,13 @@ to execute-actions
     ;Read all messages and apply the changes
     update-message-intentions f_messages
     
-    update_desire
-    update_addbus_intention
-    update_drive_intention
-    update_comm_intention f_messages
+    if(addbus_intention != "init")
+    [
+      update_desire
+      update_addbus_intention
+      update_drive_intention
+      update_comm_intention f_messages
+    ]
     
     
     ;send message 
@@ -322,6 +326,7 @@ to execute-actions
         if bus_number != 0 [add-bus(3)]
         set bus_id_list lput (bus_number + 24) bus_id_list
         set bus_number bus_number + 1
+        set bus_real_number bus_number
         set i i + 1
       ]
     ]
@@ -333,8 +338,9 @@ to execute-actions
       
       set add_bus_index (bus_number + 24)
       
-      ;set bus_number bus_number + 1
+      set bus_number (bus_number + 1)
       set addbus_intention "none"
+      show word "ask init bus " add_bus_index
     ]
     
     if(drive_intention = "wait" or (drive_intention = "none") )
@@ -343,6 +349,8 @@ to execute-actions
     ]
     if(drive_intention = "deserve" or (drive_intention = "maintain") )
     [   
+      if(route_index = "-1" or (route_index = -1))
+      [show word "init? " addbus_intention]
       ; check whether a bus is in a bus stop
       if (current_stop = (item route_index fixed_route) ) [
         if(previous_stop != -1) [
@@ -355,7 +363,8 @@ to execute-actions
         let next_dir_index (get-next-direction-index bus_id false)
         set direction (item 0 next_dir_index)
         set route_index (item 1 next_dir_index)
-      
+        if(route_index = -1)
+        [show "WARNING1 route_index = -1 "]
         drop-passenger fixed_route
         pick-passenger fixed_route
       ]
@@ -374,7 +383,8 @@ to execute-actions
         let next_dir_index (get-next-direction-index bus_id false)
         set direction (item 0 next_dir_index)
         set route_index (item 1 next_dir_index)
-        
+        if(route_index = -1)
+        [show "WARNING2 route_index = -1 "]
         ;only drop passenger 
         drop-passenger deviate_route 
       ]

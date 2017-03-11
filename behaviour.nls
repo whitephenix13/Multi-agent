@@ -32,10 +32,14 @@ to update_drive_intention
       ifelse(temp_route_index = ( (length new_fixed_route) - 1) )
       [
         set route_index (temp_route_index - 1)
+                if(route_index = -1)
+        [show "WARNING4 route_index = -1 "]
         set direction "RETURN"
       ]
       [
         set route_index (temp_route_index + 1)
+                if(route_index = -1)
+        [show "WARNING5 route_index = -1 "]
         set direction "GO"
       ]
       set drive_intention "deserve"  
@@ -61,33 +65,57 @@ to update_comm_intention [f_messages]
     set comm_intention "disable"
     set break? true
   ]
-  ;TODO: ALex LELL
-  ;TODO: compute the current_route using the same type of code as below
-  ;TODO if current_route != -1
-     ;TODO check if the bus is at a station he deserves (see check_stations? below) and that he is not replying to a message ( (ticks - last_reply_time) > 2, ie I did not send a reply 
-     ;during update-message-intentions
-        ;TODO: check for undercrowded station using the function in heuristic
-        ;TODO: if station_id != -1 ; ie: find one 
+    let current_route -1
+    if(drive_intention = "deserve" or (drive_intention = "maintain"))
+    [set current_route fixed_route]
+    ;we do not check for optimization if we are deviating 
+    if(drive_intention = "deviate" or (drive_intention = "wait"))
+    [set current_route -1]
+    
+  ;check if needed to drop a station
+  if current_route != -1 and (drive_intention = "deserve")
+  [ 
+     ;check if the bus is at a station he deserves and that he is not replying to a message
+     if (member? current_stop current_route) and ( (ticks - last_reply_time) > 2)
+     [
+         ;check for undercrowded station using the function in heuristic
+         let drop check-uncrowded-station current_route ticks
+         ;if station_id != -1 ; ie: found one 
+         if drop != -1
+         [
+             ;calculate current heuristic
+             let current_heuristic_value heuristic bus_type current_route ticks bus_deserving_stations
+             ;calculate new route 
+             let new_fixed_r (best-drop-station current_route drop)
+             let alternative_bus_deserving_stations update-bus-deserving-stations bus_deserving_stations bus_id new_fixed_r
+             let alternative_heuristic_value heuristic bus_type new_fixed_r ticks alternative_bus_deserving_stations 
+             ;calculate delta heuristic 
+             let delta_heuristic (alternative_heuristic_value - current_heuristic_value)
+             if delta_heuristic > 0
+             [
+               ;set station_to_drop
+               set station_to_drop drop
+               set station_to_drop_heur delta_heuristic
                
-               ;TODO calculate current heuristic (see apply request) 
+               ;build message to send
+               let drop_message_content build-INFORM-content "drop_station" (list station_to_drop station_to_drop_heur)
+               let drop_message_id build-m-id bus_id
+               let drop_message build-message bus_id drop_message_id "INFORM" drop_message_content 
                
-               ;TODO: calculate new route (use best-drop-station)
-               ;TODO: calculate new drive_intention (see apply request)
-               ;TODO: use the above to calculate new heuristic 
-               
-               ;TODO: calculate delta heuristic 
-               
-               ;TODO: if delta heuristic > 0
-                   ;TODO: set station_to_drop
-                   ;TODO: set station_to_drop_heur
-               
-                   ;TODO: build message_content using build-INFORM-content task_name (list var1 var2 ... varn) where var are station_id and delta_heuristic (or more if necessary)
-                   ;TODO: let message_id (build-m-id bus_id)
-                   ;TODO: build message build-message bus_id message_id "INFORM" message_content
-                   ;TODO: find all buses that deserve this station using bus_deserving_stations
-                   ;TODO: send a the message using  my-send-message bus_id_to_send message for all buses to whom you have to send
-      
-                   ;TODO set break? true
+               ;find all buses that deserve this station using bus_deserving_stations
+               let buses_deserving_drop item station_to_drop bus_deserving_stations
+               ;send message
+               foreach buses_deserving_drop
+               [
+                 my-send-message ? drop_message
+               ]
+               set break? true
+             ]
+         ]
+  
+     ]
+  ]
+  
   
   if (add_bus_index != -1)
   [
@@ -100,12 +128,6 @@ to update_comm_intention [f_messages]
   ]
   if( comm_intention = "none" and (not break?))
   [
-    let current_route -1
-    if(drive_intention = "deserve" or (drive_intention = "maintain"))
-    [set current_route fixed_route]
-    ;we do not check for optimization if we are deviating 
-    if(drive_intention = "deviate" or (drive_intention = "wait"))
-    [set current_route -1]
     
     if current_route != -1
     [
@@ -242,29 +264,33 @@ to update-message-intentions [f_messages]
   
   applyInform m_inform
   
-  ;Tick 0: sent a reply
-  ;Tick 1: receiver read reply and send if necessary action
-  ;Tick 2: read action if necessary 
-  if( (ticks - last_reply_time ) > 2)
-  [applyRequest m_request]
-  
-  applyReply m_reply f_messages
-  
-  
-  foreach m_action
+  if(addbus_intention != "init")
   [
-    let content get-content ?
-    let info (read-ACTION-content content false)
-    applyAction (item 0 info) (item 1 info)
+    ;Tick 0: sent a reply
+    ;Tick 1: receiver read reply and send if necessary action
+    ;Tick 2: read action if necessary 
+    if( (ticks - last_reply_time ) > 2)
+    [applyRequest m_request]
+    
+    applyReply m_reply f_messages
+    
+    
+    foreach m_action
+    [
+      let content get-content ?
+      let info (read-ACTION-content content false)
+      applyAction (item 0 info) (item 1 info)
+    ]
   ]
   
 end
-;TODO: check if not probelm with action message 
+
 to applyInform[m_inform]
-  ;TODO: Alex LELL 
-  ;TODO: create list to memorize the delta heuristic for drop
-  ;TODO: create list (same order as previous one! ) to memorize the bus_id for drop
-  
+  ;create list to memorize the delta heuristic for drop
+  let drop_deltas (list)
+  ;create list (same order as previous one! ) to memorize the bus_id for drop
+  let drop_IDs (list)
+
   foreach m_inform
   [ 
     ;parse message and get a list where the first element is the task name, all the following one are the var values AS A STRING ; (use "read-from-string str" to get an integer/list ... of the list 
@@ -273,12 +299,15 @@ to applyInform[m_inform]
     let task_name (item 0 list_infos)
     if task_name = "init"
     [
+      show "init"
       ;show "received init inform " 
       set fixed_route read-from-string(item 1 list_infos)
       set deviate_route read-from-string(item 2 list_infos)
       set start_delay read-from-string(item 3 list_infos)
       set direction (item 4 list_infos)
       set route_index read-from-string(item 5 list_infos)
+              if(route_index = -1)
+        [show "WARNING6 route_index = -1 "]
       set desire (item 6 list_infos)
       set drive_intention (item 7 list_infos)
       set comm_intention (item 8 list_infos)
@@ -286,33 +315,98 @@ to applyInform[m_inform]
       if(drive_intention = "deserve")
       [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
     ] 
-    if task_name = "unwait_deserve"
+    if task_name = "unwait_deserve" and (addbus_intention != "init")
     [
       ;set intention to deserve
       set drive_intention (item 1 list_infos)
     ]
-      ;TODO: check if task_name is nameOfTheTaskForDrop 
-          ;TODO: check if station_id of the message is the same as station_to_drop
-              ;TODO add bus id to list of bus_id_drop 
-              ;TODO add d_heuristic to list of d_heur_drop 
-  ]
-  ;TODO if at least one bus does not want to drop the station I want to drop (check length of drop_list +1 (!!!! +1 to count myself) and bus_deserving_stations)
-      ;TODO: compute new route (think carefully at where the station you are dropping is, you might need to change the route_index and direction values)
-      ;TODO: compute new bus_deserving_station
-      ;TODO: set station_to_drop to -1
-      ;TODO: set station_to_drop_heur to 0 
-      ;TODO: drop station 
-  ;TODO: else
-      ;TODO: add my id to the list (if not done) and my d_heur to the list (if not done) using the one I memorized in station_to_drop_heur
-      ;TODO: compute min d_heuristic and corresponding bus_id 
-      ;TODO: if I am not the min, I can drop a station: 
-         ;TODO: compute new route (think carefully at where the station you are dropping is, you might need to change the route_index and direction values)
-         ;TODO: compute new bus_deserving_station
-         ;TODO: set station_to_drop to -1
-         ;TODO: set station_to_drop_heur to 0 
-         ;TODO: drop station 
-  
 
+    if (task_name = "drop_station") and ( read-from-string (item 1 list_infos) = station_to_drop) and (addbus_intention != "init")
+    [ 
+      ;add bus id to list of bus_id_drop
+      set drop_IDs lput (get-sender ?) drop_IDs
+      ;add d_heuristic to list of d_heur_drop 
+      set drop_deltas lput read-from-string(item 2 list_infos) drop_deltas
+    ]
+  ]
+  
+      ;if at least one bus does not want to drop the station I want to drop
+      ;+1 comes from the fact that you have to count yourself
+      ifelse (station_to_drop != -1) and ((length(drop_IDs) + 1) < length(item station_to_drop bus_deserving_stations))
+      [
+        ;DROP STATION
+        ;get-next-direction-index bus_id next (after fixed route)
+
+        let n_fixed_route (best-drop-station fixed_route station_to_drop)
+        let n_station (item route_index fixed_route)
+        
+        set deviate_route (list) 
+        if(not member? next_stop fixed_route)
+        [
+          show "WARNING: no next stop while dropping station"
+        ]
+        ifelse(member? next_stop n_fixed_route)
+        [
+          set deviate_route lput next_stop deviate_route
+        ]
+        [
+          ;finish his way to stop and then go to next stop
+          set deviate_route lput next_stop deviate_route
+          let n_stop_index (item 1 (get-next-direction-index bus_id true))
+          set deviate_route lput (item n_stop_index fixed_route) deviate_route
+        ]
+        set direction "GO"
+        set route_index 0
+        set drive_intention "deviate"
+        set new_fixed_route n_fixed_route  
+        ;: compute new bus_deserving_station
+        set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
+        
+        set station_to_drop -1
+        set station_to_drop_heur 0 
+      ]
+      ;else
+      [
+        ;add my id to the list and my d_heur to the list using the one I memorized in station_to_drop_heur
+        set drop_IDs lput bus_id drop_IDs 
+        set drop_deltas lput station_to_drop_heur drop_deltas
+        ;compute min d_heuristic and corresponding bus_id 
+        let min_idx position (min drop_deltas) drop_deltas
+        let min_ID (item min_idx drop_IDs)
+        ;if I am not the min, I can drop a station:
+        if min_ID != bus_id
+        [
+          ;DROP STATION
+          ;get-next-direction-index bus_id next (after fixed route)
+          let n_fixed_route (best-drop-station fixed_route station_to_drop)
+          let n_station (item route_index fixed_route)
+          
+          set deviate_route (list) 
+          if(not member? next_stop fixed_route)
+          [
+            show "WARNING: no next stop while dropping station"
+          ]
+          ifelse(member? next_stop n_fixed_route)
+          [
+            set deviate_route lput next_stop deviate_route
+          ]
+          [
+            ;finish his way to stop and then go to next stop
+            set deviate_route lput next_stop deviate_route
+            let n_stop_index (item 1 (get-next-direction-index bus_id true))
+            set deviate_route lput (item n_stop_index fixed_route) deviate_route
+          ]
+          set direction "GO"
+          set route_index 0
+          set drive_intention "deviate"
+          set new_fixed_route n_fixed_route  
+          ;: compute new bus_deserving_station
+          set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
+          
+          set station_to_drop -1
+          set station_to_drop_heur 0 
+        ]
+      ]
 end
 
 to applyRequest[m_request]
@@ -666,6 +760,8 @@ to applyAction[var_name var_value]
       ;direction stays the same 
       ;set the route index to the correct value
       set route_index (position (item route_index fixed_route) new_fixed_route)
+              if(route_index = -1)
+        [show "WARNING3 route_index = -1 "]
       set fixed_route new_fixed_route
       
      ;show word word (item route_index new_fixed_route) " " new_fixed_route 

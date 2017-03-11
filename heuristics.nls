@@ -79,7 +79,7 @@ to-report check-uncrowded-station [route current_ticks]
   
   if ((hourly_passenger_location = 0) or (length(route) < 3))
   [
-    report (list)
+    report -1
   ]
   
   foreach route
@@ -100,7 +100,6 @@ to-report check-uncrowded-station [route current_ticks]
     let min_idx position min_val l_value
     set res (item min_idx l_id)
   ]
-
   report res
 end
 
