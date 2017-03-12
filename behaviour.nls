@@ -32,14 +32,10 @@ to update_drive_intention
       ifelse(temp_route_index = ( (length new_fixed_route) - 1) )
       [
         set route_index (temp_route_index - 1)
-                if(route_index = -1)
-        [show "WARNING4 route_index = -1 "]
         set direction "RETURN"
       ]
       [
         set route_index (temp_route_index + 1)
-                if(route_index = -1)
-        [show "WARNING5 route_index = -1 "]
         set direction "GO"
       ]
       set drive_intention "deserve"  
@@ -299,15 +295,12 @@ to applyInform[m_inform]
     let task_name (item 0 list_infos)
     if task_name = "init"
     [
-      show "init"
       ;show "received init inform " 
       set fixed_route read-from-string(item 1 list_infos)
       set deviate_route read-from-string(item 2 list_infos)
       set start_delay read-from-string(item 3 list_infos)
       set direction (item 4 list_infos)
       set route_index read-from-string(item 5 list_infos)
-              if(route_index = -1)
-        [show "WARNING6 route_index = -1 "]
       set desire (item 6 list_infos)
       set drive_intention (item 7 list_infos)
       set comm_intention (item 8 list_infos)
@@ -760,8 +753,6 @@ to applyAction[var_name var_value]
       ;direction stays the same 
       ;set the route index to the correct value
       set route_index (position (item route_index fixed_route) new_fixed_route)
-              if(route_index = -1)
-        [show "WARNING3 route_index = -1 "]
       set fixed_route new_fixed_route
       
      ;show word word (item route_index new_fixed_route) " " new_fixed_route 

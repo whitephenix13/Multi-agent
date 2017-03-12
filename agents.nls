@@ -340,7 +340,6 @@ to execute-actions
       
       set bus_number (bus_number + 1)
       set addbus_intention "none"
-      show word "ask init bus " add_bus_index
     ]
     
     if(drive_intention = "wait" or (drive_intention = "none") )

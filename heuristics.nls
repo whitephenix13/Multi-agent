@@ -41,20 +41,39 @@ to-report heuristic[my_bus_type route day_time _bus_deserving_stations]
 
 end
 
+;to-report check-overcrowded-station [bus_stop]
+  ;let bus_deserve_ids item bus_stop bus_deserving_stations
+  ;let total_remaining_seat 0
+  ;let res 0
+  ;foreach bus_deserve_ids [
+  ;  set total_remaining_seat (total_remaining_seat + remaining-bus-capacity ?)
+ ; ]
+  ;ifelse( length(get-passengers-at-stop bus_stop) > total_remaining_seat) [
+  ;  set res bus_stop
+  ;] 
+  ;[
+  ;  set res false
+ ; ]
+ ; report res
+;end
+
 to-report check-overcrowded-station [bus_stop]
-  let bus_deserve_ids item bus_stop bus_deserving_stations
-  let total_remaining_seat 0
-  let res 0
-  foreach bus_deserve_ids [
-    set total_remaining_seat (total_remaining_seat + remaining-bus-capacity ?)
-  ]
-  ifelse( length(get-passengers-at-stop bus_stop) > total_remaining_seat) [
-    set res bus_stop
-  ] 
+  ;Reports a station which is overcrowded or false if none 
+  let tol 80 ; TODO: manually tune this 
+  
+  if ((hourly_passenger_location = 0))
   [
-    set res false
+    report false
   ]
-  report res
+  let expected-people (compute-expected-people (list bus_stop) ticks bus_deserving_stations)
+  ifelse (expected-people > tol)
+  [
+      report bus_stop
+  ]
+  [
+    report false
+  ]
+  
 end
 
 to-report is-uncrowded [station current_ticks]
@@ -71,11 +90,10 @@ to-report is-uncrowded [station current_ticks]
 end
 
 to-report check-uncrowded-station [route current_ticks]
-  ;Reports a station to remove or -1 of NONE :WARNING: NEVER REMOVE CENTRAAL STATION (index=3) FIND ANOTHER STATION IF THE MIN IS CENTRAAL
+  ;Reports a station to remove or -1 if none :WARNING: NEVER REMOVE CENTRAAL STATION (index=3) FIND ANOTHER STATION IF THE MIN IS CENTRAAL
   let l_id (list)
   let l_value (list)
   let res -1
-  let hour ((floor (ticks / 60) ) mod 24)
   
   if ((hourly_passenger_location = 0) or (length(route) < 3))
   [
