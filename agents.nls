@@ -65,7 +65,8 @@ buses-own [
 ; hourly_passenger_location: memorize in a list of list the estimated number of passenger at a stop given the time (in hour)
 ; init_num_bus_per_line: for convienience and parameter optimization. this number is fixed 
 ; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
-globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
+; tracked_passenger is a global variable ONLY used for optimization. It contains [passenger_ID current_bus_ID(-1 if no current bus) current_station]
+globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay tracked_passenger]
 
 ;TODO FIRST: rewrite read reaply since the task name has been added and check that it is used correctly everywhere 
 ;TODO_WAIT :
@@ -84,6 +85,10 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 ;TODO: change ticks<60 in behaviour overcrowded line 
  to init-buses
+   if tracked_passenger = 0
+   [
+     set tracked_passenger  (list 1781 -1 -1)
+   ]
   ;bus comes from bus_init 
   ifelse(ticks < 3)
   [
@@ -189,17 +194,12 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 end
 
-to drop-passenger[current_route drop_all?]
+to drop-passenger[current_route]
   ; if the bus is in centraal, drop everyone that don't have this destination on this route
-  ifelse(drop_all? = true)
+
+
+  ifelse current_stop = 3 
   [
-        foreach bus_passengers [
-        drop-off-passenger (item 0 ?)
-      ]
-  ]
-  [
-    ifelse current_stop = 3 
-    [
       foreach bus_passengers 
       [ 
         let pass_stop (item 1 ?)  
@@ -215,13 +215,12 @@ to drop-passenger[current_route drop_all?]
         set should_drop? ((pass_stop = current_stop) or should_drop?)
         if (should_drop? = True)[drop-off-passenger (item 0 ?) ]
       ]
-    ]
-    [
-      ; drop a passenger if it is his stop
+  ]
+  [
+    ; drop a passenger if it is his stop
       foreach bus_passengers [
         if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
       ]
-    ]
   ]
 end
 to pick-passenger[current_route]
@@ -350,21 +349,9 @@ to execute-actions
       set addbus_intention "none"
     ]
     
-    if(drive_intention = "none")
+    if(drive_intention = "wait" or (drive_intention = "none") )
     [
       ;do nothing
-    ]
-    if(drive_intention = "wait"  )
-    [
-      ;if we are at a stop: do not drive, drop everyone if needed
-      ifelse(member? current_stop fixed_route)
-      [
-         drop-passenger fixed_route true ;drop everyone
-      ]
-      ;drive until next stop
-      [
-        travel-to item route_index fixed_route 
-      ]
     ]
     if(drive_intention = "deserve" or (drive_intention = "maintain") )
     [   
@@ -384,7 +371,7 @@ to execute-actions
         set route_index (item 1 next_dir_index)
         if(route_index = -1)
         [show "WARNING1 route_index = -1 "]
-        drop-passenger fixed_route false
+        drop-passenger fixed_route
         pick-passenger fixed_route
       ]
       travel-to item route_index fixed_route 
@@ -392,8 +379,6 @@ to execute-actions
     if(drive_intention = "deviate")
     [
       ; check whether a bus is in a bus stop
-      ;if the bus stop is the first of the deviate route, drop everyone
-      ;if(current_stop = item 0 
       if current_stop = item route_index deviate_route 
       [
         if(previous_stop != -1) [
@@ -407,12 +392,58 @@ to execute-actions
         if(route_index = -1)
         [show "WARNING2 route_index = -1 "]
         ;only drop passenger 
-        drop-passenger deviate_route false
+        drop-passenger deviate_route 
       ]
       if(route_index < length(deviate_route))
       [travel-to item route_index deviate_route]
     ]
   ]
+  if ((item 1 tracked_passenger) = -1) and ((item 2 tracked_passenger) = -1)
+    [
+      if (bus_id = 24) ;execute only once per tick
+      [
+        let i 0
+        while [i < 24]
+        [
+         foreach (get-passengers-at-stop i)
+         [
+           
+           if ((item 0 ?) = (item 0 tracked_passenger))
+           [
+            set tracked_passenger (replace-item 2 tracked_passenger i)
+            show (word "Found passenger at station " i " " ticks)
+           ]
+         ]
+         set i (i + 1)
+          
+        ]
+        
+      ] 
+    ]
+  if ((item 1 tracked_passenger) = -1) and (member? (item 0 tracked_passenger) bus_passengers)
+      [
+        show (word "Picked up passenger at station " (item 2 tracked_passenger) " " ticks)
+        set tracked_passenger (replace-item 1 tracked_passenger bus_id)
+        set tracked_passenger (replace-item 2 tracked_passenger -1)
+      ]
+  if (bus_id = (item 1 tracked_passenger) and not  (member? (item 0 tracked_passenger) bus_passengers))
+    [
+      set tracked_passenger (replace-item 2 tracked_passenger current_stop)
+      set tracked_passenger (replace-item 1 tracked_passenger -1)
+      let passenger item (item 0 tracked_passenger) passengers
+      ifelse (item 2 tracked_passenger) = (item 1 passenger)
+      [
+        show (word "Passenger arrived at station " (item 1 passenger) " " ticks)
+      ]
+      [
+              show (word "Dropped at station " (item 2 tracked_passenger) " " ticks)
+      ]
+    ]
+  if  (bus_id = (item 1 tracked_passenger) and (member? (item 0 tracked_passenger) bus_passengers) and (current_stop != -1))
+    [
+      show(word "At station " current_stop " " ticks)
+    ]
 end
+
 
 
