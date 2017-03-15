@@ -392,6 +392,8 @@ to execute-actions
     if(drive_intention = "deviate")
     [
       ; check whether a bus is in a bus stop
+      ;if the bus stop is the first of the deviate route, drop everyone
+      ;if(current_stop = item 0 
       if current_stop = item route_index deviate_route 
       [
         if(previous_stop != -1) [
