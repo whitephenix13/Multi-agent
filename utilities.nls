@@ -274,3 +274,20 @@ to-report set-gain[bus_add_size]
   if bus_add_size = 3 [set gain  20000 / -1250000]
   report gain
 end
+
+to-report drop-for-connection [current_station destination current_bus_id _bus_deserving_station]
+;drop a passenger at a station if he can take another bus that can drive him to its destination
+;report true if should drop, false otherwise
+let should_drop? false
+foreach (item current_station _bus_deserving_station)
+[
+  ;check buses that go through current_station and destination
+  if(member? ? (item destination _bus_deserving_station))
+  [
+    if(? = current_bus_id)
+    [report false]
+    set should_drop? true
+  ]
+]
+report should_drop?
+end

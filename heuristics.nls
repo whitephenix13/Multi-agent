@@ -59,7 +59,7 @@ end
 
 to-report check-overcrowded-station [bus_stop]
   ;Reports a station which is overcrowded or false if none 
-  let tol 80 ; TODO: manually tune this 
+  let tol 50 ; TODO: manually tune this 
   
   if ((hourly_passenger_location = 0))
   [

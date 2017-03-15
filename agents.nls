@@ -194,12 +194,23 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 end
 
-to drop-passenger[current_route]
+to drop-passenger[current_route drop_all?]
   ; if the bus is in centraal, drop everyone that don't have this destination on this route
+<<<<<<< HEAD
 
 
   ifelse current_stop = 3 
+=======
+  ifelse(drop_all? = true)
+>>>>>>> acf879060da709316c0a2ef40e08138946925c8b
   [
+        foreach bus_passengers [
+        drop-off-passenger (item 0 ?)
+      ]
+  ]
+  [
+    ifelse current_stop = 3 
+    [
       foreach bus_passengers 
       [ 
         let pass_stop (item 1 ?)  
@@ -215,12 +226,19 @@ to drop-passenger[current_route]
         set should_drop? ((pass_stop = current_stop) or should_drop?)
         if (should_drop? = True)[drop-off-passenger (item 0 ?) ]
       ]
-  ]
-  [
-    ; drop a passenger if it is his stop
-      foreach bus_passengers [
-        if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
+    ]
+    [
+      if(member? current_stop current_route)
+      [
+        ; drop a passenger if it is his stop or at a station where a bus can direclty drive him to its destination
+        foreach bus_passengers [
+          let passenger_at_stop? (item 1 ? = current_stop)
+          let drop_for_connection? (drop-for-connection current_stop (item 1 ?) bus_id bus_deserving_station)
+          if passenger_at_stop? or drop_for_connection?
+          [drop-off-passenger (item 0 ?)] 
+        ]
       ]
+    ]
   ]
 end
 to pick-passenger[current_route]
@@ -349,9 +367,21 @@ to execute-actions
       set addbus_intention "none"
     ]
     
-    if(drive_intention = "wait" or (drive_intention = "none") )
+    if(drive_intention = "none")
     [
       ;do nothing
+    ]
+    if(drive_intention = "wait"  )
+    [
+      ;if we are at a stop: do not drive, drop everyone if needed
+      ifelse(member? current_stop fixed_route)
+      [
+         drop-passenger fixed_route true ;drop everyone
+      ]
+      ;drive until next stop
+      [
+        travel-to item route_index fixed_route 
+      ]
     ]
     if(drive_intention = "deserve" or (drive_intention = "maintain") )
     [   
@@ -371,7 +401,7 @@ to execute-actions
         set route_index (item 1 next_dir_index)
         if(route_index = -1)
         [show "WARNING1 route_index = -1 "]
-        drop-passenger fixed_route
+        drop-passenger fixed_route false
         pick-passenger fixed_route
       ]
       travel-to item route_index fixed_route 
@@ -379,6 +409,11 @@ to execute-actions
     if(drive_intention = "deviate")
     [
       ; check whether a bus is in a bus stop
+      ;if the bus stop is the first of the deviate route, drop everyone
+      if(current_stop = item 0 deviate_route)
+      [
+         drop-passenger deviate_route true
+      ]
       if current_stop = item route_index deviate_route 
       [
         if(previous_stop != -1) [
@@ -392,7 +427,7 @@ to execute-actions
         if(route_index = -1)
         [show "WARNING2 route_index = -1 "]
         ;only drop passenger 
-        drop-passenger deviate_route 
+        drop-passenger deviate_route false
       ]
       if(route_index < length(deviate_route))
       [travel-to item route_index deviate_route]
