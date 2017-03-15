@@ -65,8 +65,7 @@ buses-own [
 ; hourly_passenger_location: memorize in a list of list the estimated number of passenger at a stop given the time (in hour)
 ; init_num_bus_per_line: for convienience and parameter optimization. this number is fixed 
 ; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
-; tracked_passenger is a global variable ONLY used for optimization. It contains [passenger_ID current_bus_ID(-1 if no current bus) current_station]
-globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay tracked_passenger]
+globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay]
 
 ;TODO FIRST: rewrite read reaply since the task name has been added and check that it is used correctly everywhere 
 ;TODO_WAIT :
@@ -85,10 +84,6 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 ;TODO: change ticks<60 in behaviour overcrowded line 
  to init-buses
-   if tracked_passenger = 0
-   [
-     set tracked_passenger  (list 20 -1 -1)
-   ]
   ;bus comes from bus_init 
   ifelse(ticks < 3)
   [
@@ -196,13 +191,7 @@ end
 
 to drop-passenger[current_route drop_all?]
   ; if the bus is in centraal, drop everyone that don't have this destination on this route
-<<<<<<< HEAD
-
-
-  ifelse current_stop = 3 
-=======
   ifelse(drop_all? = true)
->>>>>>> acf879060da709316c0a2ef40e08138946925c8b
   [
         foreach bus_passengers [
         drop-off-passenger (item 0 ?)
@@ -233,7 +222,7 @@ to drop-passenger[current_route drop_all?]
         ; drop a passenger if it is his stop or at a station where a bus can direclty drive him to its destination
         foreach bus_passengers [
           let passenger_at_stop? (item 1 ? = current_stop)
-          let drop_for_connection? (drop-for-connection current_stop (item 1 ?) bus_id bus_deserving_station)
+          let drop_for_connection? (drop-for-connection current_stop (item 1 ?) bus_id bus_deserving_stations)
           if passenger_at_stop? or drop_for_connection?
           [drop-off-passenger (item 0 ?)] 
         ]
@@ -432,12 +421,6 @@ to execute-actions
       if(route_index < length(deviate_route))
       [travel-to item route_index deviate_route]
     ]
-    if (tracked_passenger item 1 = bus_id) and (current_station != -1)
-    [
-      replace-item 1 tracked_passenger current_station
-      print word("Passenger is at station " (item 1 tracked_passeger))   
-    ]
-    
   ]
 end
 
