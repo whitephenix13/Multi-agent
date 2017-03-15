@@ -217,9 +217,15 @@ to drop-passenger[current_route drop_all?]
       ]
     ]
     [
-      ; drop a passenger if it is his stop
-      foreach bus_passengers [
-        if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
+      if(member? current_stop current_route)
+      [
+        ; drop a passenger if it is his stop or at a station where a bus can direclty drive him to its destination
+        foreach bus_passengers [
+          let passenger_at_stop? (item 1 ? = current_stop)
+          let drop_for_connection? (drop-for-connection current_stop (item 1 ?) bus_id bus_deserving_station)
+          if passenger_at_stop? or drop_for_connection?
+          [drop-off-passenger (item 0 ?)] 
+        ]
       ]
     ]
   ]
@@ -393,7 +399,10 @@ to execute-actions
     [
       ; check whether a bus is in a bus stop
       ;if the bus stop is the first of the deviate route, drop everyone
-      ;if(current_stop = item 0 
+      if(current_stop = item 0 deviate_route)
+      [
+         drop-passenger deviate_route true
+      ]
       if current_stop = item route_index deviate_route 
       [
         if(previous_stop != -1) [
