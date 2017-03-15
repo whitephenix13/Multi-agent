@@ -189,10 +189,17 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 end
 
-to drop-passenger[current_route]
+to drop-passenger[current_route drop_all?]
   ; if the bus is in centraal, drop everyone that don't have this destination on this route
-  ifelse current_stop = 3 
+  ifelse(drop_all? = true)
   [
+        foreach bus_passengers [
+        drop-off-passenger (item 0 ?)
+      ]
+  ]
+  [
+    ifelse current_stop = 3 
+    [
       foreach bus_passengers 
       [ 
         let pass_stop (item 1 ?)  
@@ -208,12 +215,13 @@ to drop-passenger[current_route]
         set should_drop? ((pass_stop = current_stop) or should_drop?)
         if (should_drop? = True)[drop-off-passenger (item 0 ?) ]
       ]
-  ]
-  [
-    ; drop a passenger if it is his stop
+    ]
+    [
+      ; drop a passenger if it is his stop
       foreach bus_passengers [
         if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
       ]
+    ]
   ]
 end
 to pick-passenger[current_route]
@@ -342,9 +350,21 @@ to execute-actions
       set addbus_intention "none"
     ]
     
-    if(drive_intention = "wait" or (drive_intention = "none") )
+    if(drive_intention = "none")
     [
       ;do nothing
+    ]
+    if(drive_intention = "wait"  )
+    [
+      ;if we are at a stop: do not drive, drop everyone if needed
+      ifelse(member? current_stop fixed_route)
+      [
+         drop-passenger fixed_route true ;drop everyone
+      ]
+      ;drive until next stop
+      [
+        travel-to item route_index fixed_route 
+      ]
     ]
     if(drive_intention = "deserve" or (drive_intention = "maintain") )
     [   
@@ -364,7 +384,7 @@ to execute-actions
         set route_index (item 1 next_dir_index)
         if(route_index = -1)
         [show "WARNING1 route_index = -1 "]
-        drop-passenger fixed_route
+        drop-passenger fixed_route false
         pick-passenger fixed_route
       ]
       travel-to item route_index fixed_route 
@@ -385,7 +405,7 @@ to execute-actions
         if(route_index = -1)
         [show "WARNING2 route_index = -1 "]
         ;only drop passenger 
-        drop-passenger deviate_route 
+        drop-passenger deviate_route false
       ]
       if(route_index < length(deviate_route))
       [travel-to item route_index deviate_route]

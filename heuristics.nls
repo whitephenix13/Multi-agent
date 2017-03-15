@@ -62,8 +62,8 @@ to-report check-overcrowded-station [bus_stop bus_size current_routes]
   ;take into account the bus size for tolerance 
   ;add param bus_size, current_routes
   let alpha 2
-  let tol 80
-  ;let tol (length(current_routes) / 100) * bus_size * alpha ; TODO: manually tune this
+  ;let tol 80
+  let tol (length(current_routes) / 100) * bus_size * alpha ; TODO: manually tune this
   ;show tol 
   
   if ((hourly_passenger_location = 0))
@@ -81,10 +81,10 @@ to-report check-overcrowded-station [bus_stop bus_size current_routes]
   
 end
 
-to-report is-uncrowded [station current_ticks]
-    let tol 20 ; TODO: manually tune this 
+to-report is-uncrowded [station current_ticks bus_size current_routes]
+    ;let tol 20 ; TODO: manually tune this 
     let alpha 0.5
-    ;let tol (length(current_routes) / 100) * bus_size * alpha ; TODO: manually tune this
+    let tol (length(current_routes) / 100) * bus_size * alpha ; TODO: manually tune this
     ;show tol 
     
     ;get expected number of people per bus for the next hour 
@@ -111,7 +111,7 @@ to-report check-uncrowded-station [route current_ticks]
   
   foreach route
   [
-    let uncrowded_res (is-uncrowded ? current_ticks)
+    let uncrowded_res (is-uncrowded ? current_ticks bus_capacity fixed_route)
     if (item 0 uncrowded_res)
     [
       set l_id lput ? l_id
@@ -157,7 +157,7 @@ to-report check-uncrowded-line [bus_route]
   let res 0
   let counter 0
   foreach bus_route [
-    if( item 0 (is-uncrowded ? ticks))
+    if( item 0 (is-uncrowded ? ticks bus_capacity fixed_route))
     [
       set counter (counter + 1)
     ]
