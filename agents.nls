@@ -85,9 +85,9 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 ;TODO: change ticks<60 in behaviour overcrowded line 
  to init-buses
-   if tracked_passenger = 0
+   if not is-list? tracked_passenger  
    [
-     set tracked_passenger  (list 1781 -1 -1)
+     set tracked_passenger  (list 0 -1 -1) ; from 0 to 42775
    ]
   ;bus comes from bus_init 
   ifelse(ticks < 3)
@@ -407,11 +407,11 @@ to execute-actions
         [
          foreach (get-passengers-at-stop i)
          [
-           
            if ((item 0 ?) = (item 0 tracked_passenger))
            [
             set tracked_passenger (replace-item 2 tracked_passenger i)
-            show (word "Found passenger at station " i " " ticks)
+            let passenger item (item 0 tracked_passenger) passengers
+            show (word "Found passenger at station " i " going to "  (item 3 passenger)" "ticks)
            ]
          ]
          set i (i + 1)
@@ -420,28 +420,58 @@ to execute-actions
         
       ] 
     ]
-  if ((item 1 tracked_passenger) = -1) and (member? (item 0 tracked_passenger) bus_passengers)
+  if ((item 1 tracked_passenger) = -1)
       [
-        show (word "Picked up passenger at station " (item 2 tracked_passenger) " " ticks)
-        set tracked_passenger (replace-item 1 tracked_passenger bus_id)
-        set tracked_passenger (replace-item 2 tracked_passenger -1)
+        let pas_in_bus? false
+        foreach (bus_passengers)
+        [
+          if((item 0 tracked_passenger) = (item 0 ?))
+          [set pas_in_bus? true]
+        ]
+        if(pas_in_bus? = true)
+        [
+          show (word "Picked up passenger at station " (item 2 tracked_passenger) " " ticks)
+          set tracked_passenger (replace-item 1 tracked_passenger bus_id)
+          set tracked_passenger (replace-item 2 tracked_passenger -1)
+        ]
       ]
-  if (bus_id = (item 1 tracked_passenger) and not  (member? (item 0 tracked_passenger) bus_passengers))
+  if (bus_id = (item 1 tracked_passenger))
     [
-      set tracked_passenger (replace-item 2 tracked_passenger current_stop)
-      set tracked_passenger (replace-item 1 tracked_passenger -1)
-      let passenger item (item 0 tracked_passenger) passengers
-      ifelse (item 2 tracked_passenger) = (item 1 passenger)
+      let pas_in_bus? false
+      foreach (bus_passengers)
       [
-        show (word "Passenger arrived at station " (item 1 passenger) " " ticks)
+        if((item 0 tracked_passenger) = (item 0 ?))
+        [set pas_in_bus? true]
       ]
+      if(pas_in_bus? = false)
       [
-              show (word "Dropped at station " (item 2 tracked_passenger) " " ticks)
+        let cur_stop current_stop
+        if(current_stop = -1)
+        [set cur_stop previous_stop]
+        set tracked_passenger (replace-item 2 tracked_passenger cur_stop)
+        set tracked_passenger (replace-item 1 tracked_passenger -1)
+        let passenger item (item 0 tracked_passenger) passengers
+        ifelse (item 2 tracked_passenger) = (item 3 passenger)
+        [
+          show (word "Passenger arrived at station " (item 3 passenger) " " (item 6 passenger)" " ticks)
+        ]
+        [
+          show (word "Dropped at station " (item 2 tracked_passenger) " " ticks)
+        ]
       ]
     ]
-  if  (bus_id = (item 1 tracked_passenger) and (member? (item 0 tracked_passenger) bus_passengers) and (current_stop != -1))
+  if  (bus_id = (item 1 tracked_passenger) and (current_stop != -1))
     [
-      show(word "At station " current_stop " " ticks)
+      let pas_in_bus? false
+      foreach (bus_passengers)
+      [
+        if((item 0 tracked_passenger) = (item 0 ?))
+        [set pas_in_bus? true]
+      ]
+      if(pas_in_bus? = true)
+      [
+        show(word "At station " current_stop " " ticks)
+      ]
     ]
 end
 
