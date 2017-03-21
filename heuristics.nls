@@ -57,9 +57,14 @@ end
  ; report res
 ;end
 
-to-report check-overcrowded-station [bus_stop]
+to-report check-overcrowded-station [bus_stop bus_size current_routes]
   ;Reports a station which is overcrowded or false if none 
-  let tol 50 ; TODO: manually tune this 
+  ;take into account the bus size for tolerance 
+  ;add param bus_size, current_routes
+  let alpha 1.5
+  ;let tol 80
+  let tol (1 / length(current_routes) ) * bus_size * alpha ; TODO: manually tune this
+  ;show tol 
   
   if ((hourly_passenger_location = 0))
   [
@@ -76,8 +81,12 @@ to-report check-overcrowded-station [bus_stop]
   
 end
 
-to-report is-uncrowded [station current_ticks]
-    let tol 20 ; TODO: manually tune this 
+to-report is-uncrowded [station current_ticks bus_size current_routes]
+    ;let tol 20 ; TODO: manually tune this 
+    let alpha 0.7
+    let tol (1 / length(current_routes)) * bus_size * alpha ; TODO: manually tune this
+    ;show tol 
+    
     ;get expected number of people per bus for the next hour 
     let expected-people (compute-expected-people (list station) current_ticks bus_deserving_stations)
     ;if expected number of people is under tolerance and length(bus_deserving_stations) > 1 ;ie: I'm not the only bus 
@@ -89,7 +98,7 @@ to-report is-uncrowded [station current_ticks]
     report (list false -1)
 end
 
-to-report check-uncrowded-station [route current_ticks]
+to-report check-uncrowded-station [route bus_size current_ticks]
   ;Reports a station to remove or -1 if none :WARNING: NEVER REMOVE CENTRAAL STATION (index=3) FIND ANOTHER STATION IF THE MIN IS CENTRAAL
   let l_id (list)
   let l_value (list)
@@ -102,7 +111,7 @@ to-report check-uncrowded-station [route current_ticks]
   
   foreach route
   [
-    let uncrowded_res (is-uncrowded ? current_ticks)
+    let uncrowded_res (is-uncrowded ? current_ticks bus_size route )
     if (item 0 uncrowded_res)
     [
       set l_id lput ? l_id
@@ -122,13 +131,13 @@ to-report check-uncrowded-station [route current_ticks]
 end
 
 
-to-report check-overcrowded-line [bus_route]
+to-report check-overcrowded-line [bus_route bus_size]
   let percentage ( 50 / 100)
   let max_overcrowded_stop floor(length(bus_route) * percentage)
   let res 0
   let counter 0
   foreach bus_route [
-    if( (check-overcrowded-station ?) != false)
+    if( (check-overcrowded-station ? bus_size bus_route) != false)
     [
       set counter (counter + 1)
     ]
@@ -142,13 +151,13 @@ to-report check-overcrowded-line [bus_route]
   report res
 end
 
-to-report check-uncrowded-line [bus_route]
+to-report check-uncrowded-line [bus_route bus_size]
   let percentage ( 75 / 100)
   let max_uncrowded_stop floor(length(bus_route) * percentage)
   let res 0
   let counter 0
   foreach bus_route [
-    if( item 0 (is-uncrowded ? ticks))
+    if( item 0 (is-uncrowded ? ticks bus_size bus_route))
     [
       set counter (counter + 1)
     ]

@@ -22,7 +22,6 @@ to update_drive_intention
       if(current_stop = -1 ) 
       [show (word "WARNING: current stop is -1 although it should be " length(deviate_route))]
       
-      
       ;update bus_deserving_stations
       ;the bus was in deviate and its previous route has already been removed from the variable
       set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id new_fixed_route)
@@ -38,7 +37,9 @@ to update_drive_intention
         set route_index (temp_route_index + 1)
         set direction "GO"
       ]
-      set drive_intention "deserve"  
+      set drive_intention next_deviate_intention
+      if(drive_intention = "connect")
+      [set color blue]
     ]
   ]
 end 
@@ -62,7 +63,7 @@ to update_comm_intention [f_messages]
     set break? true
   ]
     let current_route -1
-    if(drive_intention = "deserve" or (drive_intention = "maintain"))
+    if(drive_intention = "deserve" or (drive_intention = "maintain") or (drive_intention = "connect"))
     [set current_route fixed_route]
     ;we do not check for optimization if we are deviating 
     if(drive_intention = "deviate" or (drive_intention = "wait"))
@@ -75,7 +76,7 @@ to update_comm_intention [f_messages]
      if (member? current_stop current_route) and ( (ticks - last_reply_time) > 2)
      [
          ;check for undercrowded station using the function in heuristic
-         let drop check-uncrowded-station current_route ticks
+         let drop check-uncrowded-station current_route bus_capacity ticks
          ;if station_id != -1 ; ie: found one 
          if drop != -1
          [
@@ -116,7 +117,7 @@ to update_comm_intention [f_messages]
   if (add_bus_index != -1)
   [
     ; send an init message to the bus
-    let content (build-INFORM-content "init" (list add_fixed_route add_deviate_route add_start_delay add_direction add_route_index add_desire add_drive_intention add_comm_intention add_addbus_intention))
+    let content (build-INFORM-content "init" (list add_fixed_route add_deviate_route add_start_delay add_direction add_route_index add_desire add_drive_intention add_comm_intention add_addbus_intention add_next_deviate_intention))
     let message_id (build-m-id bus_id)
     let message (build-message bus_id message_id "INFORM" content)
     my-send-message add_bus_index message
@@ -133,21 +134,22 @@ to update_comm_intention [f_messages]
       ;only check line if we are at the first of last station of main_route (=fixed_route)
       let check_line? ( (current_stop = (first current_route) ) or (current_stop = (last current_route)) )
       
-      
-      if(check_line? and (break2? = false))
+      ;OVERCROWDED LINE
+      if(check_line? and (break2? = false) )
       [
-        let overcrowded_line? (check-overcrowded-line current_route)
+        let overcrowded_line? (check-overcrowded-line current_route bus_capacity)
         let delay_fine? false 
         if (overcrowded_line? != false)
         [
           set delay_fine?  (line_delay_ok overcrowded_line overcrowded_line? ticks)
         ]
         
+        ;notify all stop bus they can drive again 
        if(drive_intention = "maintain")
         [
           ;find all buses on subroute 
           let bus_on_subline (bus-on-subline current_route bus_deserving_stations)
-          let mess_content ( build-inform-content "unwait_deserve" (list "deserve") )
+          let mess_content ( build-inform-content "unwait_deserve" (list "") )
           let mess_id (build-m-id bus_id)
           let mess (build-message bus_id mess_id "INFORM" mess_content)
           foreach bus_on_subline
@@ -156,11 +158,19 @@ to update_comm_intention [f_messages]
 
           ] 
           ;change own intention to deserve
-          set drive_intention "deserve"
+          set drive_intention next_maintain_intention
           set break2? true
         ]
-        
-        if(delay_fine? = true and (not break2?))
+        if( (drive_intention = "connect") and(not break2?))
+        [
+          ;simulate that the bus sent a request for new bus 
+          set last_sent_request "connect ask for bus"
+          set last_request_time ticks 
+          set comm_intention "disable"
+          set disable_tick ticks
+        ]
+        ;
+        if(delay_fine? = true and (not break2?) and (drive_intention != "connect"))
         [     
           set message_receivers (list)
           set message_to_send "" 
@@ -185,9 +195,10 @@ to update_comm_intention [f_messages]
           set break2? true
         ]
       ]
-      if(check_stations? and (break2? = false))
+      ;OVERCROWDED STATION
+      if(check_stations? and (break2? = false) and (drive_intention != "connect"))
       [
-        let overcrowded_station? (check-overcrowded-station current_stop)
+        let overcrowded_station? (check-overcrowded-station current_stop bus_capacity current_route)
         let delay_fine? false 
         if (overcrowded_station? != false)
         [
@@ -222,12 +233,12 @@ to update_comm_intention [f_messages]
         ]
       ]
 
-      ;check for uncrowded line
-      let uncrowded_line? (check-uncrowded-line current_route)
+      ;UNCROWDED LINE
+      let uncrowded_line? (check-uncrowded-line current_route bus_capacity )
       ;ask the other bus if can stop
-      if(uncrowded_line? != false and (drive_intention = "deserve" or (drive_intention = "maintain") ) and (not break2?) )
+      if(uncrowded_line? != false and (drive_intention = "deserve" or (drive_intention = "maintain") or (drive_intention = "connect")) and (not break2?) )
       [
-        set message_receivers (bus-on-superline current_route bus_deserving_stations)
+        set message_receivers (bus-on-superline bus_id current_route bus_deserving_stations)
         let message_cont (build-REQUEST-content "wait_deserve" 0 0);need no value and no threshold
         let mess_id (build-m-id bus_id)
         set message_to_send (build-message bus_id mess_id "REQUEST" message_cont)
@@ -295,8 +306,8 @@ to applyInform[m_inform]
     let task_name (item 0 list_infos)
     if task_name = "init"
     [
-      ;show "received init inform " 
       set fixed_route read-from-string(item 1 list_infos)
+      set new_fixed_route fixed_route
       set deviate_route read-from-string(item 2 list_infos)
       set start_delay read-from-string(item 3 list_infos)
       set direction (item 4 list_infos)
@@ -305,13 +316,14 @@ to applyInform[m_inform]
       set drive_intention (item 7 list_infos)
       set comm_intention (item 8 list_infos)
       set addbus_intention (item 9 list_infos)
-      if(drive_intention = "deserve")
+      set next_deviate_intention (item 10 list_infos)
+      if(drive_intention = "deserve" or (drive_intention = "connect"))
       [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
     ] 
-    if task_name = "unwait_deserve" and (addbus_intention != "init")
+    if task_name = "unwait_deserve" and (addbus_intention != "init") and (drive_intention = "wait")
     [
       ;set intention to deserve
-      set drive_intention (item 1 list_infos)
+      set drive_intention next_wait_intention
     ]
 
     if (task_name = "drop_station") and ( read-from-string (item 1 list_infos) = station_to_drop) and (addbus_intention != "init")
@@ -351,6 +363,7 @@ to applyInform[m_inform]
         set direction "GO"
         set route_index 0
         set drive_intention "deviate"
+        set next_deviate_intention "deserve"
         set new_fixed_route n_fixed_route  
         ;: compute new bus_deserving_station
         set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
@@ -392,6 +405,7 @@ to applyInform[m_inform]
           set direction "GO"
           set route_index 0
           set drive_intention "deviate"
+          set next_deviate_intention"deserve"
           set new_fixed_route n_fixed_route  
           ;: compute new bus_deserving_station
           set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
@@ -408,7 +422,7 @@ to applyRequest[m_request]
   let corresponding_task_name  ""
   
   let current_route -1
-  if(drive_intention = "deserve" or (drive_intention = "maintain"))
+  if(drive_intention = "deserve" or (drive_intention = "maintain") or( drive_intention = "connect"))
   [set current_route fixed_route]
 
   if(drive_intention = "deviate" or (drive_intention = "wait"))
@@ -426,10 +440,10 @@ to applyRequest[m_request]
       
       let break? false
       
-      if(var_name = "overcrowded_line" and (break? = false))
+      if(var_name = "overcrowded_line" and (break? = false)and (drive_intention != "connect") and (next_maintain_intention != "connect") )
       [
         ;wait for every bus to be on the line 
-        if( ticks > 60 and ((not-abandoning-station current_route var_val) = true))
+        if( ticks > 2 and ((not-abandoning-station current_route var_val) = true))
         [
           ;compute the cost of reaching the new route
           let next_index -1
@@ -466,6 +480,7 @@ to applyRequest[m_request]
             ]
             [
               set new_drive_intention "deviate"
+              set next_deviate_intention drive_intention
               set deviate_route dev_route
             ]
             ;show (word word word word dev_route " " drive_intention " " new_drive_intention)
@@ -482,10 +497,10 @@ to applyRequest[m_request]
         ]
         set break? true
       ]
-      if(var_name = "overcrowded_station" and (break? = false) )
+      if(var_name = "overcrowded_station" and (break? = false)and (drive_intention != "connect") and (next_maintain_intention != "connect") )
       [
         ;wait for every bus to be on the line 
-        if( ticks > 60) 
+        if( ticks > 2 and (length(current_route) < 8 )) 
         [
           ;show word "reply to overcrowded station: " ticks
           ;compute route induced by the addition of the overcrowded station to current_route
@@ -537,7 +552,7 @@ to applyRequest[m_request]
       ]
       
       
-      if(break? = false)
+      if(break? = false and (drive_intention != "connect") and (next_maintain_intention != "connect") )
       [
         show( word (word "WARNING: the following variable name: " var_name) " was not handled in applyRequest")
       ]
@@ -570,10 +585,15 @@ to applyReply[m_reply f_messages]
   let expect_task_name "" 
   if( last_sent_request != "")
   [
-    set expect_task_name(item 0 read-REPLY-content(get-content last_sent_request))
+    ifelse(drive_intention = "connect" or (next_maintain_intention = "connect") )
+    [set expect_task_name "ask for bus"]
+    [set expect_task_name(item 0 read-REPLY-content(get-content last_sent_request))]
   ]
-  if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve") and (expect_task_name != "wait_deserve" and (expect_task_name != "") ) )
+  ;ASK FOR NEW BUSES 
+  if(length (m_reply) = 0 and ( (ticks - last_request_time) = 2) and (drive_intention = "deserve" or (drive_intention = "connect") ) and (expect_task_name != "wait_deserve" and (expect_task_name != "") ) )
   [
+    if(drive_intention = "connect")
+    [set last_sent_request ""]
     ;In order to find to good size, estimate the expected number of people to pick on a full route loop
     ;Time to do your route loop: mean_time_between_stop * number_stop
     let expected_route_time 6.32 * (length(fixed_route) - 1) 
@@ -636,16 +656,17 @@ to applyReply[m_reply f_messages]
     [set add_size init_add_size]
     
    ; show word word add_size " " gain
-    if(gain > 0 and (bus_number < 100))
+   
+    if(gain > 0 and (bus_number < 200))
     [
       ;set the init parameter of the bus 
       set addbus_intention "add"
       set add_fixed_route fixed_route
       ifelse member? 3 fixed_route 
-      [set add_deviate_route find-way-to-route 3 fixed_route]
       [set add_deviate_route (list)]
+      [set add_deviate_route find-way-to-route 3 fixed_route]
       ;check if we are not already on the new route knowing that we start at stop 3
-      if (3 = (first add_deviate_route))
+      if (length(add_deviate_route) > 0 and (3 = (first add_deviate_route)))
       [
         set add_deviate_route (remove-item 0 add_deviate_route)
       ]
@@ -668,7 +689,11 @@ to applyReply[m_reply f_messages]
         set add_direction "GO"
       ]
       set add_desire "deserve"
-      ifelse(length(add_deviate_route) > 0)[set add_drive_intention "deviate"]
+      ifelse(length(add_deviate_route) > 0)
+      [
+        set add_drive_intention "deviate"
+        set add_next_deviate_intention drive_intention
+      ]
       [set add_drive_intention "deserve"]
       set add_comm_intention "none"
       set add_addbus_intention "none"
@@ -728,6 +753,15 @@ to applyReply[m_reply f_messages]
   ]
   if(can_wait = true)
   [
+    if(next_wait_intention != "connect" and next_wait_intention != "deserve")
+    [
+      ifelse(drive_intention = "connect" or drive_intention = "deserve")
+         [set next_wait_intention drive_intention]
+         [
+           if(drive_intention = "maintain")
+           [set next_wait_intention next_maintain_intention]
+         ]
+    ]
     set drive_intention "wait"
     ;send an action to one of the sender to ask to switch from "deserve" to "maintain"
     let mess_content (build-action-content "wait_deserve" "maintain") 
@@ -783,6 +817,16 @@ to applyAction[var_name var_value]
     ]
     if(var_name = "wait_deserve")
     [
+      if(next_maintain_intention != "connect" and next_maintain_intention != "deserve")
+      [
+         ifelse(drive_intention = "connect" or drive_intention = "deserve")
+         [set next_maintain_intention drive_intention]
+         [
+           if(drive_intention = "wait")
+           [set next_maintain_intention next_wait_intention]
+         ]
+      ]
+     
       set drive_intention var_value
       set break? true  
     ]

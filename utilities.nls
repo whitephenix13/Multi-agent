@@ -21,7 +21,7 @@ to-report equal-route-stops[route1 route2]
   ]
   report true
 end
-to-report bus-on-superline[bus_route _bus_deserving_station]
+to-report bus-on-superline[_busid bus_route _bus_deserving_station]
   let same_route_bus (list)
   let first_loop? true
   foreach bus_route
@@ -42,11 +42,12 @@ to-report bus-on-superline[bus_route _bus_deserving_station]
           [set temp lput ? temp]
         ]
         ;actualize the same_route_bus 
-        set same_route_bus temp
     ]
     set first_loop? false
+    set same_route_bus temp
   ]
-  
+  if(member? _busid same_route_bus)
+  [set same_route_bus remove-item (position _busid same_route_bus) same_route_bus]
   report same_route_bus
 end
 
@@ -104,7 +105,7 @@ to-report get-next-direction-index[b_id get_next_next]
     
     ifelse(next_stop = -1 or (next_stop = false) or (get_next_next = true))
     [
-      if(drive_intention = "deserve" or (drive_intention = "maintain"))
+      if(drive_intention = "deserve" or (drive_intention = "maintain") or (drive_intention = "connect") )
       [
         let break? false
         ;update index 
@@ -234,7 +235,7 @@ end
 
 to-report get_buses_with_different_route[bus_route _bus_deserving_station]
   let res bus_id_list
-  let same_route_bus (bus-on-superline bus_route _bus_deserving_station)
+  let same_route_bus (bus-on-superline bus_id bus_route _bus_deserving_station)
   ;remove buses that have the same route 
   foreach same_route_bus
   [
@@ -290,4 +291,9 @@ foreach (item current_station _bus_deserving_station)
   ]
 ]
 report should_drop?
+end
+
+;function to test if there is a bus connecting directly those two stations
+to-report connecting-stations [station1 station2]
+  report (length(bus-on-superline -1 (list station1 station2) bus_deserving_stations) > 0)
 end

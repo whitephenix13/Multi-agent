@@ -23,7 +23,7 @@ buses-own [
   ;Behavioural variables 
   desire          ; Can be "deserve" (deserve its line) "maintain" (assure that rarely used station are deserved) "connect" (assure connections between several lines)
   addbus_intention; Can be "addinit"(add buses at the beginning) "add" (add bus during runtime) "none" 
-  drive_intention ; Can be "wait"(do not move) "deserve"(deserve its own line) "maintain" (deserve a line but remember that some bus are in wait intention in it) "deviate"
+  drive_intention ; Can be "wait"(do not move) "deserve"(deserve its own line) "maintain" (deserve a line but remember that some bus are in wait intention in it) "deviate" "connect"
   comm_intention  ; Can be "send"(send a message) "disable" (can't send message REQUEST or INFORM) "none" (do nothing)
   message_content         ; Set this variable in behaviour.nls when the bus wants to send a message. This will be the message sent.
   disable_tick    ; tick value when the bus send a message for a discussion he initiated. Prevents spamming 
@@ -48,10 +48,14 @@ buses-own [
   add_route_index    ; variable to init a new bus
   add_desire         ; variable to init a new bus
   add_drive_intention; variable to init a new bus
+  add_next_deviate_intention; variable to init a new bus
   add_comm_intention ; variable to init a new bus
   add_addbus_intention; variable to init a new bus
     
+  next_maintain_intention; When a bus ends his maintain, this will be his new drive intention
+  next_wait_intention; When a bus ends his wait, this will be his new drive intention
   new_drive_intention; Used when the bus is replying to a message. This intention will be his new drive_intention if he "wins" the request.
+  next_deviate_intention ; When a bus ends his deviate route, this will be his new drive intention
   deviate_route      ; This is the route that the bus will follow when he is deviating from its main fixed_route
   new_fixed_route    ; This is the new fixed route that the bus will follow when we wins the request. He might first have to take the deviate route in order to reach this one.
   
@@ -66,28 +70,15 @@ buses-own [
 ; init_num_bus_per_line: for convienience and parameter optimization. this number is fixed 
 ; message_overcrow_delay: for convienience: this number is fixed and used for overcrowded_station and overcrowded_line
 ; tracked_passenger is a global variable ONLY used for optimization. It contains [passenger_ID current_bus_ID(-1 if no current bus) current_station]
-globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay tracked_passenger]
+; connect_route: fixed route used by connect buses to assure connection between lines 
+globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hourly_passenger_location init_num_bus_per_line message_overcrow_delay tracked_passenger connect_route]
 
-;TODO FIRST: rewrite read reaply since the task name has been added and check that it is used correctly everywhere 
-;TODO_WAIT :
-    ;dd = duty done , cc = code commented , ww = write work
-    ;TODO: dd set current_route to -1 if "wait"/..."maintain"
-    ;TODO: dd heristics.nls Complete check-undercrowded-line
-    ;TODO: dd utilities.nls Write a bus-on-superline to find buses that share the same station as me also check for equal-route-stops
-    ;TODO: dd utilities.nls Write a bus-on-subline to find buses that share at least one stop with my line also check for equal-route-stops
-    ;TODO: ww behaviour.nls Complete update_comm_intention to send a request message for the vote to the buses deserving any longer lines than mine.
-    ;TODO: dd behaviour.nls Complete update_comm_intention add the "maintain" intention: if overcrowded line, send message to any bus in subline and unstop them, switch to deserve
-    ;TODO: ddw behaviour.nls Complete apply request to reply YES/NO to the wait request 
-    ;TODO: dd behaviour.nls Complete apply reply : if one yes go to "wait" intention and send an action to the YES bus (which one?) to set his intention to "maintain"
-    ;TODO: dd behaviour.nls Complete apply action: if "wait" then change intention to maintain
-    ;TODO: dd behaviour.nls Complete apply inform: if received an unwait message, set intention to deserve 
-    ;TODO: dd agent.nls Complete execute-action, add the "wait" intention and the "maintain"
 
 ;TODO: change ticks<60 in behaviour overcrowded line 
  to init-buses
    if not is-list? tracked_passenger  
    [
-     set tracked_passenger  (list 0 -1 -1) ; from 0 to 42775
+     set tracked_passenger  (list 16050 -1 -1) ; from 0 to 42775
    ]
   ;bus comes from bus_init 
   ifelse(ticks < 3)
@@ -99,6 +90,8 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
     if(message_overcrow_delay = 0)
     [set message_overcrow_delay 30]
     
+    if(connect_route = 0)
+    [set connect_route [1 7 13 22 12]]
     if overcrowded_station = 0
     [
       set overcrowded_station (list)
@@ -113,12 +106,13 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
     set graph [[22 15 14] [11 19 23 7] [8] [16 4 20 9] [3 5 10] [4 16 10 17] [8] [1 17 13] [2 6 9] [3 8 20] [4 5 17 13 21] [1 16 17] [20 15 22] [7 10 22 23] [0 23] [0 12 18] [3 5 11] [5 7 10 11] [15] [1 23] [3 9 12 21] [10 20 22] [0 12 13 21] [1 13 14 19]]
     
     ; Initialize your agents here.
-    if bus_id mod 6 = 0 [set fixed_route [3 9 8 6 8 2]]
-    if bus_id mod 6 = 1 [set fixed_route [3 20 12 15 18]]
-    if bus_id mod 6 = 2 [set fixed_route [3 20 21 22 0]]
-    if bus_id mod 6 = 3 [set fixed_route [3 4 10 13 23 14]]
-    if bus_id mod 6 = 4 [set fixed_route [3 4 5 17 7 1 19]]
-    if bus_id mod 6 = 5 [set fixed_route [3 16 11]] 
+    if bus_id mod 7 = 0 [set fixed_route [3 9 8 6 8 2]]
+    if bus_id mod 7 = 1 [set fixed_route [3 20 12 15 18]]
+    if bus_id mod 7 = 2 [set fixed_route [3 20 21 22 0]]
+    if bus_id mod 7 = 3 [set fixed_route [3 4 10 13 23 14]]
+    if bus_id mod 7 = 4 [set fixed_route [3 4 5 17 7 1 19]]
+    if bus_id mod 7 = 5 [set fixed_route [3 16 11]] 
+    if bus_id mod 7 = 6 [set fixed_route connect_route] 
     
     ;set a delay so that the buses are equally distributed over the line 
     let line_length (compute-route-length fixed_route)
@@ -135,7 +129,8 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
         set i (i + 1)
       ]
     ]
-    set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)
+    if(bus_id mod 7 != 6)
+    [set bus_deserving_stations (update-bus-deserving-stations bus_deserving_stations bus_id fixed_route)]
     
     set direction "GO"
     set route_index 1
@@ -145,8 +140,18 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
    if bus_type = 2 [set bus_capacity 60 set bus_cost 12000]
    if bus_type = 3 [set bus_capacity 150 set bus_cost 20000]  
    
+    ifelse bus_id mod 7 = 6 [
+        set color blue
+        set desire "deserve" 
+        set drive_intention "deviate"
+        set deviate_route [3 20 21 22]
+        set next_deviate_intention "connect"
+        set new_fixed_route fixed_route
+    ]
+    [
     set desire "deserve" 
-    set drive_intention "deserve" 
+    set drive_intention "deserve"
+    ] 
     set comm_intention "none"
     set addbus_intention "none"
     
@@ -157,7 +162,7 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
     set last_request_time -10
     
     set last_sent_request ""
-
+    
   ]
   ;bus was created because another bus asked for it. In order to init, wait for him to receive an init message 
   [
@@ -194,106 +199,110 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
 
 end
 
-to drop-passenger[current_route]
-  ; if the bus is in centraal, drop everyone that don't have this destination on this route
-
-
-  ifelse current_stop = 3 
+to drop-pass[current_route drop_all?]
+  ;if drop_all? or at centraal or on connect line : drop everyone
+  ifelse(drop_all? = true or(current_stop = 3 ) or(member? current_stop connect_route) )
   [
-      foreach bus_passengers 
-      [ 
-        let pass_stop (item 1 ?)  
-        let should_drop? True
-        ;check if passenger stop is on the bus route
-        foreach current_route 
-        [
-          let route ?
-          if (pass_stop = route )
-          [ set should_drop? False ]
-        ]
-        ;check if the passenger stop is the current_stop 
-        set should_drop? ((pass_stop = current_stop) or should_drop?)
-        if (should_drop? = True)[drop-off-passenger (item 0 ?) ]
+    let test length(bus_passengers)
+        foreach bus_passengers [
+        drop-off-passenger (item 0 ?)
       ]
   ]
   [
-    ; drop a passenger if it is his stop
+    ;if current station of passenger: drop
+    if(member? current_stop current_route)
+    [
+      ; drop a passenger if it is his stop or at a station where a bus can direclty drive him to its destination
       foreach bus_passengers [
-        if item 1 ? = current_stop [drop-off-passenger (item 0 ?)] 
+        let passenger_at_stop? (item 1 ? = current_stop)
+        let drop_for_connection? (drop-for-connection current_stop (item 1 ?) bus_id bus_deserving_stations)
+        if passenger_at_stop? or drop_for_connection?
+        [drop-off-passenger (item 0 ?)] 
       ]
+    ]
+  ]
+
+end
+to drop-connect[current_route]
+  ;if station = 22 : drop everyone 
+  if(current_stop = 22)
+  [
+      foreach bus_passengers [
+        drop-off-passenger (item 0 ?)
+      ]
+  ]
+  foreach bus_passengers [
+  ;if exist bus connection current stop to desire stop: drop
+    if(connecting-stations current_stop (item 1 ?))
+    [
+      drop-off-passenger (item 0 ?)
+    ]
   ]
 end
-to pick-passenger[current_route]
-    ; if the bus is in centraal pick passenger with destination that matches the bus route
-    ifelse current_stop = 3 
+to pick-pass[current_route]
+  foreach get-passengers-at-stop (current_stop) 
+  [
+    if length(bus_passengers) < bus_capacity 
     [
-        foreach get-passengers-at-stop (current_stop) 
+      ;if at connecting stations ie station 3 or on connect_route: pick if can drop on current line 
+      ifelse(current_stop = 3 or (member? current_stop connect_route))
+      [
+        let v ?
+        ; if at station 22 and no bus can connect directly 22 to desired destination, pick him in order to bring it to station 3
+        ; this ensure than no one stay stucked on the connect route
+        ifelse(current_stop = 22)
         [
-          if length(bus_passengers) < bus_capacity 
+          let bring_to_centraal true
+          ;check if a bus connect one of the station of connect_route to destination
+          foreach(connect_route)
           [
-            let v ?
-            foreach current_route 
-            [
-              if ((item 1 v = ?) and (? != current_stop) )[ pick-up-passenger (item 0 v) ]
-            ]
+            set bring_to_centraal (bring_to_centraal and (not connecting-stations ? (item 1 v)))
+          ]
+          if (bring_to_centraal) 
+          [
+            pick-up-passenger (item 0 v)
+            ;if(bus_id = 30)
+            ;[show (word "pick " (item 0 v) " bring to centraal") ]
           ]
         ]
-    ]
-    [
-      
-       ; L is a list of station before going to the same station
-      let L []
-      ;check direction
-      if(direction = "GO")
-      [
-        ;get all stop after this one towards the end of the route
-        let i route_index 
-        while[i < length(current_route)]
         [
-          set L lput (item i current_route) L
-          set i (i + 1)
-        ]
-      ]
-      if(direction = "RETURN")
-      [
-        ;get all stop after this one towards the end of the route
-        let i route_index 
-        while[i >= 0]
-        [
-          set L lput (item i current_route) L
-          set i (i - 1)
-        ]
-      ]
-      
-      ; if the bus is not full 
-      if length(bus_passengers) < bus_capacity 
-      [ foreach get-passengers-at-stop (current_stop) 
-        [  
-          if length(bus_passengers) < bus_capacity 
+          ;check if can drop the passenger on the line
+          foreach current_route 
           [
-            ; if the passenger's destination is on this bus route and is on L, pick the passenger
-            ifelse member? item 1 ? current_route 
-            [
-              if member? item 1 ? L 
-              [
-                pick-up-passenger (item 0 ?)
-              ]
-            ]
-            ; if the passenger's destination is not on this bus route, but the bus goes to centraal, pick the passenger
-            [
-              if member? 3 L 
-              [
-                pick-up-passenger (item 0 ?)
-              ]
+            let can_drop_on_line ((item 1 v = ?) and (? != current_stop) )
+            if can_drop_on_line 
+            [ pick-up-passenger (item 0 v) 
             ]
           ]
         ]
       ]
+      [
+        let bus_that_can_connect (bus-on-superline -1 (list current_stop (item 1 ?)) bus_deserving_stations)
+        ;pick if I can lead him to destination or if no other buses can
+        if(length(bus_that_can_connect) = 0 or (member? bus_id bus_that_can_connect))
+        [
+          pick-up-passenger (item 0 ?)
+        ]
+      ]
     ]
-      
+  ]
+end
+to pick-connect[current_route]
+  foreach get-passengers-at-stop (current_stop) [
+    if length(bus_passengers) < bus_capacity 
+    [
+      ;pick if no bus can lead from current station to destination
+      let bus_that_can_connect (bus-on-superline -1 (list current_stop (item 1 ?)) bus_deserving_stations)
+      if((length(bus_that_can_connect) = 0 and current_stop != 22) or (member? bus_id bus_that_can_connect) )
+      [
+        pick-up-passenger (item 0 ?)
+      ]
+    ]
+  ]
 end
 
 to execute-actions 
+
   ifelse(start_delay > 0)
   [
     set start_delay (start_delay - 1 )
@@ -348,14 +357,46 @@ to execute-actions
       set bus_number (bus_number + 1)
       set addbus_intention "none"
     ]
-    
-    if(drive_intention = "wait" or (drive_intention = "none") )
+    if(drive_intention = "none")
     [
       ;do nothing
     ]
-    if(drive_intention = "deserve" or (drive_intention = "maintain") )
+    if(drive_intention = "wait"  )
+    [
+      ;if we are at a stop: do not drive, drop everyone if needed
+      ifelse(current_stop != -1)
+      [
+         drop-pass fixed_route true ;drop everyone
+      ]
+      ;drive until next stop
+      [
+        travel-to item route_index fixed_route 
+      ]
+     ]
+    if(drive_intention = "connect" or (drive_intention = "maintain" and next_maintain_intention = "connect") )
+    [
+      ; check whether a bus is in a bus stop
+      if (current_stop = (item route_index fixed_route) ) [
+        if(previous_stop != -1) [
+          set travelled_distance travelled_distance + my-get-distance previous_stop current_stop
+        ]
+        ;compute next stop
+        let break? false
+        
+        ;update index and direction 
+        let next_dir_index (get-next-direction-index bus_id false)
+        set direction (item 0 next_dir_index)
+        set route_index (item 1 next_dir_index)
+        if(route_index = -1)
+        [show "WARNING1 route_index = -1 "]
+        drop-connect fixed_route
+        pick-connect fixed_route
+      ]
+      travel-to item route_index fixed_route 
+    ]
+    if(drive_intention = "deserve" or (drive_intention = "maintain" and next_maintain_intention != "connect") )
     [   
-      if(route_index = "-1" or (route_index = -1))
+          if(route_index = "-1" or (route_index = -1))
       [show word "init? " addbus_intention]
       ; check whether a bus is in a bus stop
       if (current_stop = (item route_index fixed_route) ) [
@@ -371,14 +412,19 @@ to execute-actions
         set route_index (item 1 next_dir_index)
         if(route_index = -1)
         [show "WARNING1 route_index = -1 "]
-        drop-passenger fixed_route
-        pick-passenger fixed_route
+        drop-pass fixed_route false
+        pick-pass fixed_route
       ]
       travel-to item route_index fixed_route 
     ]
     if(drive_intention = "deviate")
     [
       ; check whether a bus is in a bus stop
+      ;if the bus stop is the first of the deviate route, drop everyone
+      if(current_stop = item 0 deviate_route)
+      [
+         drop-pass deviate_route true
+      ]
       if current_stop = item route_index deviate_route 
       [
         if(previous_stop != -1) [
@@ -392,12 +438,18 @@ to execute-actions
         if(route_index = -1)
         [show "WARNING2 route_index = -1 "]
         ;only drop passenger 
-        drop-passenger deviate_route 
+        drop-pass deviate_route false
       ]
       if(route_index < length(deviate_route))
       [travel-to item route_index deviate_route]
     ]
   ]
+  
+  
+
+  
+  
+  ;Keep track of where a specific passenger is 
   if ((item 1 tracked_passenger) = -1) and ((item 2 tracked_passenger) = -1)
     [
       if (bus_id = 24) ;execute only once per tick
