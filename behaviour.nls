@@ -198,11 +198,7 @@ to update_comm_intention [f_messages]
       ;OVERCROWDED STATION
       if(check_stations? and (break2? = false) and (drive_intention != "connect"))
       [
-<<<<<<< HEAD
         let overcrowded_station? (check-overcrowded-station current_stop bus_capacity current_route)
-=======
-        let overcrowded_station? (check-overcrowded-station current_stop bus_capacity fixed_route)
->>>>>>> 7c17c5967bc950a574fa9d0c55d504bcdf1189a2
         let delay_fine? false 
         if (overcrowded_station? != false)
         [
