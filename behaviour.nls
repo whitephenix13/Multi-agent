@@ -500,7 +500,7 @@ to applyRequest[m_request]
       if(var_name = "overcrowded_station" and (break? = false)and (drive_intention != "connect") and (next_maintain_intention != "connect") )
       [
         ;wait for every bus to be on the line 
-        if( ticks > 2 and (length(current_route) < 8 )) 
+        if( ticks > 2 and (length(current_route) < 7 )) 
         [
           ;show word "reply to overcrowded station: " ticks
           ;compute route induced by the addition of the overcrowded station to current_route

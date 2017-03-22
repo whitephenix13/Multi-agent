@@ -78,7 +78,7 @@ globals [graph bus_number bus_real_number bus_id_list bus_deserving_stations hou
  to init-buses
    if not is-list? tracked_passenger  
    [
-     set tracked_passenger  (list 16050 -1 -1) ; from 0 to 42775
+     set tracked_passenger  (list 21283 -1 -1) ; from 0 to 42775
    ]
   ;bus comes from bus_init 
   ifelse(ticks < 3)
@@ -276,7 +276,7 @@ to pick-pass[current_route]
           ]
         ]
       ]
-      [
+      [     
         let bus_that_can_connect (bus-on-superline -1 (list current_stop (item 1 ?)) bus_deserving_stations)
         ;pick if I can lead him to destination or if no other buses can
         if(length(bus_that_can_connect) = 0 or (member? bus_id bus_that_can_connect))
@@ -291,11 +291,28 @@ to pick-connect[current_route]
   foreach get-passengers-at-stop (current_stop) [
     if length(bus_passengers) < bus_capacity 
     [
+        let v ?
+        let connect_on_line? false
+        let from_this_stop? false
+        let from_stop -1
+        ;check if a bus connect one of the station of connect_route to destination
+        foreach(connect_route)
+        [
+          if(connecting-stations ? (item 1 v))
+          [
+             set connect_on_line? true
+             set from_stop ?
+             if(? = current_stop)
+             [set from_this_stop? true]
+          ]
+        ]
+        if(from_this_stop?)
+        [set from_stop current_stop]
       ;pick if no bus can lead from current station to destination
-      let bus_that_can_connect (bus-on-superline -1 (list current_stop (item 1 ?)) bus_deserving_stations)
-      if((length(bus_that_can_connect) = 0 and current_stop != 22) or (member? bus_id bus_that_can_connect) )
+      let bus_that_can_connect (bus-on-superline -1 (list from_stop (item 1 v)) bus_deserving_stations)
+      if( ((item 1 v) != current_stop ) and ((connect_on_line? and not from_this_stop?) or (not connect_on_line? and current_stop != 22) or (member? bus_id bus_that_can_connect)))
       [
-        pick-up-passenger (item 0 ?)
+        pick-up-passenger (item 0 v)
       ]
     ]
   ]
