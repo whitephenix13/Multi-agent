@@ -61,9 +61,15 @@ to-report check-overcrowded-station [bus_stop bus_size current_routes]
   ;Reports a station which is overcrowded or false if none 
   ;take into account the bus size for tolerance 
   ;add param bus_size, current_routes
+<<<<<<< HEAD
   let alpha 1.5
   ;let tol 80
   let tol (1 / length(current_routes) ) * bus_size * alpha ; TODO: manually tune this
+=======
+  let alpha 2
+  ;let tol 80
+  let tol (length(current_routes) / 100) * bus_size * alpha ; TODO: manually tune this
+>>>>>>> 7c17c5967bc950a574fa9d0c55d504bcdf1189a2
   ;show tol 
   
   if ((hourly_passenger_location = 0))
@@ -83,8 +89,13 @@ end
 
 to-report is-uncrowded [station current_ticks bus_size current_routes]
     ;let tol 20 ; TODO: manually tune this 
+<<<<<<< HEAD
     let alpha 0.7
     let tol (1 / length(current_routes)) * bus_size * alpha ; TODO: manually tune this
+=======
+    let alpha 0.5
+    let tol (length(current_routes) / 100) * bus_size * alpha ; TODO: manually tune this
+>>>>>>> 7c17c5967bc950a574fa9d0c55d504bcdf1189a2
     ;show tol 
     
     ;get expected number of people per bus for the next hour 
@@ -111,7 +122,11 @@ to-report check-uncrowded-station [route bus_size current_ticks]
   
   foreach route
   [
+<<<<<<< HEAD
     let uncrowded_res (is-uncrowded ? current_ticks bus_size route )
+=======
+    let uncrowded_res (is-uncrowded ? current_ticks bus_capacity fixed_route)
+>>>>>>> 7c17c5967bc950a574fa9d0c55d504bcdf1189a2
     if (item 0 uncrowded_res)
     [
       set l_id lput ? l_id
@@ -137,7 +152,11 @@ to-report check-overcrowded-line [bus_route bus_size]
   let res 0
   let counter 0
   foreach bus_route [
+<<<<<<< HEAD
     if( (check-overcrowded-station ? bus_size bus_route) != false)
+=======
+    if( (check-overcrowded-station ? bus_capacity fixed_route) != false)
+>>>>>>> 7c17c5967bc950a574fa9d0c55d504bcdf1189a2
     [
       set counter (counter + 1)
     ]
@@ -157,7 +176,11 @@ to-report check-uncrowded-line [bus_route bus_size]
   let res 0
   let counter 0
   foreach bus_route [
+<<<<<<< HEAD
     if( item 0 (is-uncrowded ? ticks bus_size bus_route))
+=======
+    if( item 0 (is-uncrowded ? ticks bus_capacity fixed_route))
+>>>>>>> 7c17c5967bc950a574fa9d0c55d504bcdf1189a2
     [
       set counter (counter + 1)
     ]
