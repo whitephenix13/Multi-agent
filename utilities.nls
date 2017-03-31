@@ -27,7 +27,7 @@ to-report bus-on-superline[_busid bus_route _bus_deserving_station]
   foreach bus_route
   [
     if(? < 0)
-    report (list)
+    [report (list)]
     ;memorize buses that so far have the same route 
     let temp (list)
     ; get bus id list at this stop
